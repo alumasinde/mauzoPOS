@@ -17,7 +17,7 @@ column is ✅ and docs are updated).
 | # | Phase | Status |
 |---|---|---|
 | 0 | Project foundation & tooling | 🟡 (CI not yet run — no remote) |
-| 1 | Platform foundation, tenants & authentication | ⬜ |
+| 1 | Platform foundation, tenants & authentication | ✅ |
 | 2 | Business profiles & onboarding | ⬜ |
 | 3 | Module registry & permissions | ⬜ |
 | 4 | Products, categories & barcodes | ⬜ |
@@ -68,20 +68,20 @@ column is ✅ and docs are updated).
 
 | Feature | DB | API | UI | Tests | Status |
 |---|---|---|---|---|---|
-| `core/security`: argon2id hashing, token generation | ➖ | ⬜ | ➖ | ⬜ | ⬜ |
-| Platform users (CRUD, roles) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Platform login / logout / sessions | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Platform MFA (TOTP) for privileged users | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Password recovery (email token) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Login history & session management (revoke) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Tenants: create / activate / suspend / view | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Tenant context middleware (tenant from token, never from the request) | ➖ | ⬜ | ➖ | ⬜ | ⬜ |
-| Tenant employee login (email/username + password) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Tenant optional MFA | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Audit log writer + platform audit log viewer | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Login rate limiting / lockout | ⬜ | ⬜ | ➖ | ⬜ | ⬜ |
-| Platform dashboard shell (layout, nav, auth guard) | ➖ | ➖ | ⬜ | ⬜ | ⬜ |
-| Back-office shell (layout, auth guard) | ➖ | ➖ | ⬜ | ⬜ | ⬜ |
+| `core/security`: argon2id hashing, token generation | ➖ | ✅ | ➖ | ✅ | ✅ |
+| Platform users (CRUD, roles) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Platform login / logout / sessions | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Platform MFA (TOTP) for privileged users | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Password recovery (email token) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Login history & session management (revoke) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Tenants: create / activate / suspend / view | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Tenant context middleware (tenant from token, never from the request) | ➖ | ✅ | ➖ | ✅ | ✅ |
+| Tenant employee login (email/username + password) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Tenant optional MFA | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Audit log writer + platform audit log viewer | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Login rate limiting / lockout | ✅ | ✅ | ➖ | ✅ | ✅ |
+| Platform dashboard shell (layout, nav, auth guard) | ➖ | ➖ | ✅ | ➖ | ✅ |
+| Back-office shell (layout, auth guard) | ➖ | ➖ | ✅ | ➖ | ✅ |
 
 ## Phase 2 — Business profiles & onboarding
 
@@ -330,3 +330,5 @@ column is ✅ and docs are updated).
 | 2026-11-22 | Project initialised: README.md, progress.md, docs/permissions.md, `.env.example`, POS reference image |
 | 2026-11-22 | Phase 0: Go backend skeleton (config, db, httpx, middleware, health, migrations, worker, `pkg/money`), pnpm workspace with 4 shared packages, web/platform/pos apps, Wails POS .exe, lint + CI config. Go tests incl. DB integration pass; 14 frontend tests pass; all apps build. |
 | 2026-11-22 | `golangci-lint run` → 0 issues. Fixed 58 findings: errcheck (deferred `Close`), errorlint (`errors.Is` for `http.ErrAbortHandler`), gocritic exitAfterDefer (`cmd/*` restructured to `run() error`), revive exported doc comments. |
+| 2026-11-23 | Phase 1 (mostly): `core/security` (argon2id, tokens, TOTP, ULID), `core/identity`, `core/authz`, auth middleware, `core/mail`, `core/audit`; migrations 00002–00004 (tenants+slug, auth sessions/history/resets, platform+tenant users); modules tenants/auth/users/audit with platform + tenant auth contexts; foundation seed (`admin@mauzo.local` / `ChangeMe123!`, demo tenant `demo` / `owner@demo.local`); 5 auth integration tests vs `mauzo_test`; platform app (login+MFA challenge, forgot/reset, shell, tenants, users, audit) + web app (slug login+MFA, forgot/reset, shell, audit). Verified live via Vite proxy: platform + tenant login, `/me`. All checks green: `golangci-lint` 0 issues, `go test`, `svelte-check`, eslint+prettier, `pnpm -r build`. |
+| 2026-11-23 | Phase 1 completed: `MfaPanel` (shared TOTP setup/disable, recovery codes) + Account page (sessions list + revoke, sign-in history) in both apps; tenant edit modal (PATCH); integration tests for tenants/users/audit; `testutil` serialized on a MySQL named lock to stop cross-package truncation races; `audit.Log.Data` NULL-scan fix. |

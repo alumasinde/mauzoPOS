@@ -7,6 +7,8 @@ package testutil
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -21,8 +23,15 @@ import (
 var (
 	once    sync.Once
 	shared  *sqlx.DB
+	lock    *sql.Conn //nolint:unused // held so the MySQL named lock lives until process exit
 	initErr error
 )
+
+// suiteLock serializes whole-table truncation across test packages: `go test`
+// runs package binaries in parallel and they share one test database, so a
+// MySQL named lock (held on a dedicated conn for the life of the binary) makes
+// package suites run one at a time.
+const suiteLock = "mauzo_test_suite"
 
 // DB returns a migrated connection to the test database, shared across the
 // tests in one package. Tests must clean up rows they create (see Truncate).
@@ -39,6 +48,9 @@ func DB(t testing.TB) *sqlx.DB {
 		if initErr != nil {
 			return
 		}
+		if initErr = acquireSuiteLock(ctx, shared); initErr != nil {
+			return
+		}
 		initErr = db.MigrateUp(ctx, shared.DB)
 	})
 	if initErr != nil {
@@ -50,12 +62,33 @@ func DB(t testing.TB) *sqlx.DB {
 	return shared
 }
 
+// acquireSuiteLock takes the named MySQL lock on a dedicated connection that is
+// never returned to the pool — it releases automatically when the test binary
+// exits. Waits up to 5 minutes for other package binaries to finish.
+func acquireSuiteLock(ctx context.Context, conn *sqlx.DB) error {
+	c, err := conn.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	var got int
+	if err := c.QueryRowContext(ctx, "SELECT GET_LOCK(?, 300)", suiteLock).Scan(&got); err != nil {
+		_ = c.Close()
+		return err
+	}
+	if got != 1 {
+		_ = c.Close()
+		return errors.New("GET_LOCK timed out waiting for another test package")
+	}
+	lock = c
+	return nil
+}
+
 // Truncate empties the given tables after the test.
 func Truncate(t testing.TB, conn *sqlx.DB, tables ...string) {
 	t.Helper()
 	t.Cleanup(func() {
 		for _, tbl := range tables {
-			if _, err := conn.Exec("DELETE FROM " + tbl); err != nil {
+			if _, err := conn.ExecContext(context.Background(), "DELETE FROM "+tbl); err != nil {
 				t.Errorf("truncate %s: %v", tbl, err)
 			}
 		}

@@ -11,8 +11,13 @@ import (
 
 	"mauzo/internal/app"
 	"mauzo/internal/core/httpx"
+	"mauzo/internal/core/identity"
 	mw "mauzo/internal/core/middleware"
+	auditmod "mauzo/internal/modules/audit"
+	"mauzo/internal/modules/auth"
 	"mauzo/internal/modules/system"
+	"mauzo/internal/modules/tenants"
+	"mauzo/internal/modules/users"
 )
 
 // New builds the HTTP router: global middleware and module routes.
@@ -40,11 +45,30 @@ func New(c *app.Container) http.Handler {
 	return r
 }
 
-// platformRoutes: platform-admin auth context (Phase 1+).
-func platformRoutes(_ chi.Router, _ *app.Container) {}
+// platformRoutes: platform-admin auth context. Public auth endpoints sit next
+// to a group guarded by platform sessions.
+func platformRoutes(r chi.Router, c *app.Container) {
+	auth.PublicRoutes(r, c.Auth, "platform")
+	r.Group(func(r chi.Router) {
+		r.Use(mw.Authenticate(c.AuthSvc))
+		r.Use(mw.RequireActor(identity.ActorPlatformUser))
+		auth.PrivateRoutes(r, c.Auth)
+		tenants.Routes(r, c.Tenants)
+		users.PlatformRoutes(r, c.PlatformUsers)
+		auditmod.PlatformRoutes(r, c.AuditLogs)
+	})
+}
 
-// tenantRoutes: tenant employee auth context (Phase 1+).
-func tenantRoutes(_ chi.Router, _ *app.Container) {}
+// tenantRoutes: tenant employee auth context.
+func tenantRoutes(r chi.Router, c *app.Container) {
+	auth.PublicRoutes(r, c.Auth, "tenant")
+	r.Group(func(r chi.Router) {
+		r.Use(mw.Authenticate(c.AuthSvc))
+		r.Use(mw.RequireActor(identity.ActorUser))
+		auth.PrivateRoutes(r, c.Auth)
+		auditmod.TenantRoutes(r, c.AuditLogs)
+	})
+}
 
 // posRoutes: terminal + cashier auth context (Phase 6+).
 func posRoutes(_ chi.Router, _ *app.Container) {}

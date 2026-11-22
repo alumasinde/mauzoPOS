@@ -5,19 +5,27 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"time"
 
 	"github.com/joho/godotenv"
+
+	"mauzo/internal/core/security"
 )
 
 // Config is the root application configuration loaded from the environment.
 type Config struct {
-	Env     string
-	AppName string
-	HTTP    HTTPConfig
-	DB      DBConfig
-	Log     LogConfig
+	Env            string
+	AppName        string
+	PublicBaseURL  string
+	PlatformAppURL string
+	WebAppURL      string
+	HTTP           HTTPConfig
+	DB             DBConfig
+	Log            LogConfig
+	Auth           AuthConfig
+	Mail           MailConfig
 }
 
 // HTTPConfig holds HTTP server settings.
@@ -50,6 +58,35 @@ type LogConfig struct {
 	Level string
 }
 
+// AuthConfig holds session and password-hashing settings.
+type AuthConfig struct {
+	SessionTTL        time.Duration
+	Argon2MemoryKB    uint32
+	Argon2Iterations  uint32
+	Argon2Parallelism uint8
+	LoginMaxAttempts  int
+	LoginLockout      time.Duration
+}
+
+// MailConfig holds SMTP settings for transactional email (password recovery).
+// An empty Host falls back to a log-only mailer in development.
+type MailConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	From     string
+}
+
+// Argon2Params returns the configured argon2id work factors as security params.
+func (a AuthConfig) Argon2Params() security.Argon2Params {
+	p := security.DefaultArgon2Params
+	p.MemoryKB = a.Argon2MemoryKB
+	p.Iterations = a.Argon2Iterations
+	p.Parallelism = a.Argon2Parallelism
+	return p
+}
+
 // DSN builds a go-sql-driver/mysql DSN for the given database name.
 func (d DBConfig) DSN(dbName string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
@@ -70,8 +107,11 @@ func Load(envFiles ...string) (Config, error) {
 
 	e := &envReader{}
 	cfg := Config{
-		Env:     getStr("APP_ENV", "development"),
-		AppName: getStr("APP_NAME", "MauzoPOS"),
+		Env:            getStr("APP_ENV", "development"),
+		AppName:        getStr("APP_NAME", "MauzoPOS"),
+		PublicBaseURL:  getStr("PUBLIC_BASE_URL", "http://localhost:8080"),
+		PlatformAppURL: getStr("PLATFORM_APP_URL", "http://localhost:5174"),
+		WebAppURL:      getStr("WEB_APP_URL", "http://localhost:5173"),
 		HTTP: HTTPConfig{
 			Addr:            getStr("HTTP_ADDR", ":8080"),
 			AllowedOrigins:  getList("CORS_ALLOWED_ORIGINS"),
@@ -94,6 +134,21 @@ func Load(envFiles ...string) (Config, error) {
 			ConnMaxLifetime: e.duration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
 		},
 		Log: LogConfig{Level: getStr("LOG_LEVEL", "info")},
+		Auth: AuthConfig{
+			SessionTTL:        e.duration("SESSION_TOKEN_TTL", 12*time.Hour),
+			Argon2MemoryKB:    uint32(clampInt(e.int("ARGON2_MEMORY_KB", 65536), 0, math.MaxInt32)), //nolint:gosec // clamped to uint32 range
+			Argon2Iterations:  uint32(clampInt(e.int("ARGON2_ITERATIONS", 3), 0, math.MaxInt32)),    //nolint:gosec // clamped to uint32 range
+			Argon2Parallelism: uint8(clampInt(e.int("ARGON2_PARALLELISM", 2), 0, 255)),              //nolint:gosec // clamped to uint8 range
+			LoginMaxAttempts:  e.int("LOGIN_MAX_ATTEMPTS", 5),
+			LoginLockout:      e.duration("LOGIN_LOCKOUT", 15*time.Minute),
+		},
+		Mail: MailConfig{
+			Host:     getStr("SMTP_HOST", ""),
+			Port:     e.int("SMTP_PORT", 587),
+			User:     getStr("SMTP_USER", ""),
+			Password: getStr("SMTP_PASSWORD", ""),
+			From:     getStr("MAIL_FROM", "no-reply@localhost"),
+		},
 	}
 	if e.err != nil {
 		return Config{}, e.err

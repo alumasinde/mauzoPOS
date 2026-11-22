@@ -49,3 +49,8 @@ func WithTx(ctx context.Context, conn *sqlx.DB, fn func(tx *sqlx.Tx) error) (err
 
 // IsNotFound reports whether err is sql.ErrNoRows.
 func IsNotFound(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+
+// U64 converts a non-negative LastInsertId to uint64.
+func U64(id int64) uint64 {
+	return uint64(max(id, 0))
+}

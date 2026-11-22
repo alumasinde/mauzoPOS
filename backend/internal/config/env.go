@@ -75,3 +75,8 @@ func (e *envReader) duration(key string, def time.Duration) time.Duration {
 	}
 	return v
 }
+
+// clampInt bounds v so narrowing conversions are provably safe.
+func clampInt(v, lo, hi int) int {
+	return min(max(v, lo), hi)
+}

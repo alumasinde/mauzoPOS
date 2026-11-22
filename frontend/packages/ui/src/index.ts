@@ -5,6 +5,7 @@ export { default as Spinner } from './Spinner.svelte';
 export { default as Toaster } from './Toaster.svelte';
 export { default as DataTable } from './DataTable.svelte';
 export { default as StatusDot } from './StatusDot.svelte';
+export { default as MfaPanel } from './MfaPanel.svelte';
 export { toast, toasts, dismissToast } from './toast.svelte';
 export type { Toast, ToastKind } from './toast.svelte';
 export type { Column } from './types';
