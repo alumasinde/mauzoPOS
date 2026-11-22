@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "MauzoPOS",
+  "outputfilename": "MauzoPOS",
+  "frontend:dir": "../../frontend/apps/pos",
+  "frontend:install": "pnpm install",
+  "frontend:build": "pnpm build",
+  "frontend:dev:watcher": "pnpm dev",
+  "frontend:dev:serverUrl": "http://localhost:5175",
+  "wailsjsdir": "../../frontend/apps/pos/src",
+  "author": {
+    "name": "Mauzo"
+  },
+  "info": {
+    "productName": "Mauzo POS",
+    "companyName": "Mauzo",
+    "copyright": "Mauzo"
+  }
+}

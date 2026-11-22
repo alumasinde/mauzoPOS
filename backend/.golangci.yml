@@ -1,0 +1,36 @@
+version: "2"
+run:
+  timeout: 5m
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - noctx
+    - revive
+    - sqlclosecheck
+    - rowserrcheck
+    - unconvert
+    - funlen
+  settings:
+    funlen:
+      lines: 80
+      statements: 50
+    gosec:
+      excludes:
+        - G104 # handled by errcheck
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [funlen, gosec, noctx]
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - mauzo

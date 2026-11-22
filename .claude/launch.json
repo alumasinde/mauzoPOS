@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "frontend", "--filter", "web", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "platform",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "frontend", "--filter", "platform", "dev"],
+      "port": 5174
+    }
+  ]
+}

@@ -29,3 +29,13 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Wails: POS build output is embedded from here (keep the placeholder)
+backend/desktop/frontend/dist/*
+!backend/desktop/frontend/dist/.gitkeep
+backend/desktop/build/bin/
+frontend/apps/pos/src/wailsjs/
+
+# Local tool config
+.claude/settings.local.json
+backend/bin/

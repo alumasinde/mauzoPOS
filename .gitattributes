@@ -1,0 +1,6 @@
+# Keep LF in the repo and working tree (Go, Docker, shell scripts, CI on Linux).
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.webp binary
+*.exe binary

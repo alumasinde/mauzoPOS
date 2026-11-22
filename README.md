@@ -62,8 +62,11 @@ mauzoPOS/
 │   │   ├── app/                 # bootstrap & dependency wiring (container.go, server.go)
 │   │   ├── config/              # env parsing → typed Config
 │   │   ├── routes/app.go        # MASTER router: mounts every module's routes
+│   │   ├── worker/              # background job runner
+│   │   ├── testutil/            # integration-test DB helper (skips if DB unavailable)
 │   │   ├── core/                # shared infrastructure (no business rules)
-│   │   │   ├── db/              # pool, tx helper, tenant-scoped querier
+│   │   │   ├── db/              # pool, tx helper, tenant-scoped querier, migrations runner
+│   │   │   ├── logger/          # slog setup
 │   │   │   ├── httpx/           # JSON responses, error envelope, pagination
 │   │   │   ├── middleware/      # auth, tenant, branch, permission, module, ratelimit, requestid
 │   │   │   ├── authz/           # permission registry + checker
@@ -173,13 +176,16 @@ Rules:
 
 ```go
 // internal/routes/app.go
-func Mount(r chi.Router, c *app.Container) {
+func New(c *app.Container) http.Handler {
+    r := chi.NewRouter()            // + global middleware
+    system.Routes(r, c.System)      // /healthz, /readyz
     r.Route("/api/v1", func(r chi.Router) {
         r.Mount("/platform", platformRouter(c)) // platform-admin auth context
         r.Mount("/t", tenantRouter(c))          // tenant employee auth context
         r.Mount("/pos", posRouter(c))           // terminal + cashier auth context
         r.Mount("/hooks", webhookRouter(c))     // M-Pesa / eTIMS callbacks (signed, no session)
     })
+    return r
 }
 ```
 
@@ -256,8 +262,13 @@ The full catalogue is in [docs/permissions.md](docs/permissions.md).
 | Desktop | Wails v2, `modernc.org/sqlite` (pure Go, no CGO) |
 | Tests | `testing` + `testify`, integration tests against a real MySQL/MariaDB test DB |
 
-Frontend: pnpm workspace, Vite, Svelte 5 (runes), TypeScript strict, SvelteKit with
+Frontend: pnpm workspace, Vite 8, Svelte 5 (runes), TypeScript 6 strict, SvelteKit 3 with
 `adapter-static` for platform/web, plain Vite + Svelte for POS, shared `@mauzo/ui` design tokens.
+
+SvelteKit 3 notes:
+- There is no `svelte.config.js`. Kit options are passed to `sveltekit({...})` in `vite.config.ts`.
+- Use the package `imports` alias `#lib/*` instead of `$lib`, e.g. `import { api } from '#lib/api.ts'`.
+- Shared packages are consumed as TypeScript/Svelte source (no build step).
 
 ---
 
@@ -305,9 +316,14 @@ pnpm --filter web dev       # http://localhost:5173
 
 ```powershell
 cd backend/desktop
-wails dev                   # hot reload, uses frontend/apps/pos
+wails dev                   # hot reload, uses frontend/apps/pos (port 5175)
 wails build                 # → build/bin/MauzoPOS.exe
 ```
+
+The POS `vite build` writes straight into `backend/desktop/frontend/dist`, which Wails embeds.
+Generated JS bindings land in `frontend/apps/pos/src/wailsjs` (git-ignored). Go methods are
+exposed as `window.go.bindings.App.*`. Set `MAUZO_API_URL` to point the terminal at a
+different API (default `http://localhost:8080`).
 
 ### Tests
 

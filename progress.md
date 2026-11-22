@@ -16,7 +16,7 @@ column is ✅ and docs are updated).
 
 | # | Phase | Status |
 |---|---|---|
-| 0 | Project foundation & tooling | ⬜ |
+| 0 | Project foundation & tooling | 🟡 (CI not yet run — no remote) |
 | 1 | Platform foundation, tenants & authentication | ⬜ |
 | 2 | Business profiles & onboarding | ⬜ |
 | 3 | Module registry & permissions | ⬜ |
@@ -40,25 +40,29 @@ column is ✅ and docs are updated).
 
 | Feature | Status |
 |---|---|
-| Repo structure (`backend/`, `frontend/`, `docs/`) | ⬜ |
+| Repo structure (`backend/`, `frontend/`, `docs/`) | ✅ |
 | README.md, progress.md, docs/permissions.md | ✅ |
-| `backend/go.mod`, small `cmd/api/main.go`, `cmd/worker`, `cmd/migrate` | ⬜ |
-| `internal/config` (env vars + `.env` in dev) | ⬜ |
-| `internal/app` container wiring + graceful shutdown | ⬜ |
-| `internal/routes/app.go` master router | ⬜ |
-| `core/db` pool, `WithTx`, tenant-scoped querier | ⬜ |
-| `core/httpx` JSON responses, error envelope, pagination | ⬜ |
-| Middleware: request ID, slog logging, recover, CORS, rate limit | ⬜ |
-| `/healthz` and `/readyz` | ⬜ |
-| goose migrations (embedded) + `migrate up/down/status/seed` | ⬜ |
-| `pkg/money` decimal helpers + rounding rules (+ tests) | ⬜ |
-| Integration-test harness against the `mauzo_test` DB | ⬜ |
-| Frontend pnpm workspace (`packages/ui`, `api-client`, `types`, `utils`) | ⬜ |
-| Design tokens + base components (Button, Input, Table, Modal, Toast, Form) | ⬜ |
-| Scaffold `apps/platform`, `apps/web`, `apps/pos` (Svelte 5 + TS strict) | ⬜ |
-| Wails shell `backend/desktop` building the POS .exe | ⬜ |
-| Lint/format: `golangci-lint`, `gofmt`, ESLint, Prettier, `svelte-check` | ⬜ |
-| `git init` + `.gitignore` + CI pipeline (build, test, lint) | ⬜ |
+| `backend/go.mod`, small `cmd/api/main.go`, `cmd/worker`, `cmd/migrate` | ✅ |
+| `internal/config` (env vars + `.env` in dev) | ✅ |
+| `internal/app` container wiring + graceful shutdown | ✅ |
+| `internal/routes/app.go` master router (`/platform`, `/t`, `/pos`, `/hooks` contexts) | ✅ |
+| `core/db` pool, `WithTx`, tenant-scoped querier (+ integration tests) | ✅ |
+| `core/httpx` JSON responses, error envelope, strict decode, pagination (+ tests) | ✅ |
+| Middleware: request ID, slog logging, recover, CORS, rate limit (+ tests) | ✅ |
+| `/healthz` and `/readyz` (+ tests, verified live against MariaDB) | ✅ |
+| goose migrations (embedded) + `migrate up/down/status/seed/create` | ✅ |
+| `core` audit_logs table (migration 00001) | ✅ |
+| Background worker runner (`internal/worker`, panic-safe, + tests) | ✅ |
+| `pkg/money` decimal helpers, rounding modes, allocation, cash increments (+ tests) | ✅ |
+| Integration-test harness against the `mauzo_test` DB (`internal/testutil`) | ✅ |
+| Frontend pnpm workspace (`packages/ui`, `api-client`, `types`, `utils`) | ✅ |
+| Design tokens + base components (Button, TextField, DataTable, Modal, Toaster, Spinner, StatusDot) | ✅ |
+| Scaffold `apps/platform`, `apps/web`, `apps/pos` (Svelte 5 + TS strict, SvelteKit 3) | ✅ |
+| Wails shell `backend/desktop` building `MauzoPOS.exe` (Go↔UI binding, API check) | ✅ |
+| Lint/format: `gofmt`, ESLint, Prettier, `svelte-check` passing | ✅ |
+| `golangci-lint` config (`backend/.golangci.yml`) — run locally, **0 issues** | ✅ |
+| `.gitignore`, `.gitattributes` | ✅ |
+| CI pipeline `.github/workflows/ci.yml` — written, not yet run (no remote) | 🟡 |
 
 ## Phase 1 — Platform foundation, tenants & authentication
 
@@ -324,3 +328,5 @@ column is ✅ and docs are updated).
 | Date | Change |
 |---|---|
 | 2026-11-22 | Project initialised: README.md, progress.md, docs/permissions.md, `.env.example`, POS reference image |
+| 2026-11-22 | Phase 0: Go backend skeleton (config, db, httpx, middleware, health, migrations, worker, `pkg/money`), pnpm workspace with 4 shared packages, web/platform/pos apps, Wails POS .exe, lint + CI config. Go tests incl. DB integration pass; 14 frontend tests pass; all apps build. |
+| 2026-11-22 | `golangci-lint run` → 0 issues. Fixed 58 findings: errcheck (deferred `Close`), errorlint (`errors.Is` for `http.ErrAbortHandler`), gocritic exitAfterDefer (`cmd/*` restructured to `run() error`), revive exported doc comments. |
