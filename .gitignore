@@ -1,0 +1,31 @@
+# Secrets
+.env
+*.env.local
+!.env.example
+
+# Go
+backend/bin/
+backend/storage/
+backend/desktop/build/bin/
+*.exe
+*.test
+coverage.out
+
+# Node / Svelte
+node_modules/
+frontend/apps/*/build/
+frontend/apps/*/dist/
+frontend/apps/*/.svelte-kit/
+.pnpm-store/
+
+# Local data
+*.sqlite
+*.sqlite-journal
+*.db
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
