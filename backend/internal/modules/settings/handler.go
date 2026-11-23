@@ -62,6 +62,7 @@ func (h *Handler) Set(w http.ResponseWriter, r *http.Request) {
 	}
 	var req SetRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	key := chi.URLParam(r, "key")

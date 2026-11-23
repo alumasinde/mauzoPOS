@@ -21,17 +21,25 @@ type TenantWriter interface {
 	SetBusinessType(ctx context.Context, tenantID uint64, code string) error
 }
 
+// ModuleEnabler enables modules (with dependencies) inside a caller's
+// transaction — implemented by modules/registry, which owns tenant_modules.
+type ModuleEnabler interface {
+	EnableAll(ctx context.Context, q db.Querier, tenantID uint64, codes []string) error
+	Invalidate(tenantID uint64)
+}
+
 // Service owns business-type and profile business rules plus the profile
 // engine.
 type Service struct {
 	repo     *Repo
 	settings *settings.Store
 	tenants  TenantWriter
+	modules  ModuleEnabler
 }
 
 // NewService builds a Service.
-func NewService(repo *Repo, st *settings.Store, tw TenantWriter) *Service {
-	return &Service{repo: repo, settings: st, tenants: tw}
+func NewService(repo *Repo, st *settings.Store, tw TenantWriter, me ModuleEnabler) *Service {
+	return &Service{repo: repo, settings: st, tenants: tw, modules: me}
 }
 
 // ErrProfileNotFound is returned for unknown profile public ids.
@@ -154,7 +162,7 @@ func (s *Service) Apply(ctx context.Context, tenantID uint64, profilePublicID st
 		return Profile{}, err
 	}
 	err = s.repo.InTx(ctx, func(tx *sqlx.Tx, r *Repo) error {
-		if err := r.EnableModules(ctx, tenantID, p.Definition.Modules); err != nil {
+		if err := s.modules.EnableAll(ctx, tx, tenantID, p.Definition.Modules); err != nil {
 			return err
 		}
 		if s.settings == nil {
@@ -165,6 +173,7 @@ func (s *Service) Apply(ctx context.Context, tenantID uint64, profilePublicID st
 	if err != nil {
 		return Profile{}, err
 	}
+	s.modules.Invalidate(tenantID)
 	// The tenants module owns its table, so this write is outside the
 	// transaction. It goes last: business_type marks the profile as applied.
 	if s.tenants != nil {
@@ -205,31 +214,6 @@ func profileDefaults(d ProfileDefinition) (map[string]json.RawMessage, error) {
 		}
 	}
 	return defaults, nil
-}
-
-// SetModules marks exactly the given codes enabled for a tenant.
-func (s *Service) SetModules(ctx context.Context, tenantID uint64, mods []string) error {
-	for _, m := range mods {
-		if !modules.Known(m) {
-			return httpx.ErrValidation.WithDetails(map[string]any{"modules": "unknown module " + m})
-		}
-	}
-	return s.repo.SetModules(ctx, tenantID, mods)
-}
-
-// EnabledModules returns enabled module codes for a tenant.
-func (s *Service) EnabledModules(ctx context.Context, tenantID uint64) ([]string, error) {
-	rows, err := s.repo.ListModules(ctx, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	out := []string{}
-	for _, r := range rows {
-		if r.Enabled {
-			out = append(out, r.Module)
-		}
-	}
-	return out, nil
 }
 
 // ParseDefinition unmarshals the stored JSON column.

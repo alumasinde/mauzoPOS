@@ -2,6 +2,7 @@ package tenants
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -18,10 +19,29 @@ type SessionRevoker interface {
 	RevokeAllForTenant(ctx context.Context, tenantID uint64) error
 }
 
+// Provisioner sets up per-tenant reference data right after a tenant is
+// created (e.g. modules/roles creates the system roles).
+type Provisioner interface {
+	ProvisionTenant(ctx context.Context, tenantID uint64) error
+}
+
 // Service owns tenant business rules.
 type Service struct {
-	repo    *Repo
-	revoker SessionRevoker
+	repo         *Repo
+	revoker      SessionRevoker
+	provisioners []Provisioner
+}
+
+// AddProvisioner registers a hook run after every tenant creation.
+func (s *Service) AddProvisioner(p Provisioner) { s.provisioners = append(s.provisioners, p) }
+
+// TenantIDByPublicID resolves a tenant id (used by platform-side overrides).
+func (s *Service) TenantIDByPublicID(ctx context.Context, publicID string) (uint64, error) {
+	t, err := s.Get(ctx, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return t.ID, nil
 }
 
 // NewService builds a Service.
@@ -62,6 +82,11 @@ func (s *Service) Create(ctx context.Context, req CreateTenantRequest) (Tenant, 
 	}
 	if err := s.repo.Create(ctx, &t); err != nil {
 		return Tenant{}, err
+	}
+	for _, p := range s.provisioners {
+		if err := p.ProvisionTenant(ctx, t.ID); err != nil {
+			return Tenant{}, fmt.Errorf("provision tenant %d: %w", t.ID, err)
+		}
 	}
 	return t, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"mauzo/internal/core/authz"
 	"mauzo/internal/core/security"
+	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/tenants"
 	"mauzo/internal/modules/users"
 )
@@ -57,9 +58,15 @@ func (Foundation) Seed(ctx context.Context, conn *sqlx.DB) error {
 	if err := tenants.NewRepo(conn).Create(ctx, &tenant); err != nil {
 		return err
 	}
-	usvc := users.NewUserService(users.NewUserRepo(conn), params)
+	roleSvc, _ := rbacServices(conn)
+	if err := roleSvc.ProvisionTenant(ctx, tenant.ID); err != nil {
+		return err
+	}
+	usvc := users.NewUserService(users.NewUserRepo(conn), params, users.Deps{
+		Roles: roleSvc, Branches: branches.NewService(branches.NewRepo(conn)),
+	})
 	_, err := usvc.CreateTenantUser(ctx, tenant.ID,
-		"Owner", "owner@demo.local", "", "ChangeMe123!", users.UserRoleOwner)
+		"Owner", "owner@demo.local", "", "ChangeMe123!", authz.RoleOwner)
 	return err
 }
 

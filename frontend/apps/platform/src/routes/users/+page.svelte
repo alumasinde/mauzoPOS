@@ -4,7 +4,7 @@
   import type { PlatformUser } from '@mauzo/types';
   import { Button, DataTable, Modal, StatusDot, TextField, toast } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
-  import { auth } from '#lib/auth.ts';
+  import { auth } from '#lib/auth.svelte.ts';
 
   let rows = $state<PlatformUser[]>([]);
   let loading = $state(true);

@@ -37,10 +37,3 @@ type Profile struct {
 	CreatedAt      time.Time         `db:"created_at"`
 	UpdatedAt      time.Time         `db:"updated_at"`
 }
-
-// TenantModule is one tenant_modules row.
-type TenantModule struct {
-	TenantID uint64 `db:"tenant_id"`
-	Module   string `db:"module"`
-	Enabled  bool   `db:"enabled"`
-}

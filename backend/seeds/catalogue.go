@@ -7,6 +7,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"mauzo/internal/core/modules"
+
 	"mauzo/internal/core/security"
 )
 
@@ -177,7 +179,11 @@ func (Catalogue) Seed(ctx context.Context, conn *sqlx.DB) error {
 		}
 	}
 	for _, p := range seedPlans {
-		mods, err := json.Marshal(p.modules)
+		closure, err := modules.Closure(p.modules) // a plan always includes dependencies
+		if err != nil {
+			return fmt.Errorf("plan %s: %w", p.name, err)
+		}
+		mods, err := json.Marshal(closure)
 		if err != nil {
 			return err
 		}

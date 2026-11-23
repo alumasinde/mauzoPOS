@@ -52,6 +52,25 @@ func Validate(key string, raw json.RawMessage) error {
 	return check(doc, sch, key)
 }
 
+// ValidateSchema checks raw JSON against an ad-hoc schema (e.g. a module's
+// config schema). The schema is round-tripped through JSON so Go literals
+// (ints, []string) compare the same way as stored schemas.
+func ValidateSchema(schema map[string]any, raw json.RawMessage, path string) error {
+	b, err := json.Marshal(schema)
+	if err != nil {
+		return fmt.Errorf("%s: bad schema: %w", path, err)
+	}
+	var sch map[string]any
+	if err := json.Unmarshal(b, &sch); err != nil {
+		return fmt.Errorf("%s: bad schema: %w", path, err)
+	}
+	var doc any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return fmt.Errorf("%s: invalid JSON: %w", path, err)
+	}
+	return check(doc, sch, path)
+}
+
 // check validates doc against a schema subset: type, required, properties,
 // additionalProperties, enum, items, min/max(imum|Length|Items).
 func check(doc any, sch map[string]any, path string) error {

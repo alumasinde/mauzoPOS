@@ -115,3 +115,14 @@ func (r *Repo) InsertSubscription(ctx context.Context, s *Subscription) error {
 	s.ID = db.U64(id)
 	return nil
 }
+
+// CurrentPlan returns the plan of the tenant's open subscription, or sql.ErrNoRows.
+func (r *Repo) CurrentPlan(ctx context.Context, tenantID uint64) (Plan, error) {
+	var p Plan
+	err := r.db.GetContext(ctx, &p,
+		`SELECT p.id, p.public_id, p.name, p.description, p.price_kes, p.billing_interval, p.modules,
+		        p.max_branches, p.max_users, p.is_active, p.sort, p.created_at, p.updated_at
+		 FROM tenant_subscriptions s JOIN plans p ON p.id = s.plan_id
+		 WHERE s.tenant_id = ? AND s.status <> 'cancelled' ORDER BY s.id DESC LIMIT 1`, tenantID)
+	return p, err
+}

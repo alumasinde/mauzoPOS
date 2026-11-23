@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
   import type { OnboardingState } from '@mauzo/types';
-  import { auth } from '#lib/auth.ts';
+  import { auth } from '#lib/auth.svelte.ts';
   import { api } from '#lib/api.ts';
 
   let pendingSetup = $state(false);

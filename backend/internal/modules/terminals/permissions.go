@@ -2,8 +2,7 @@ package terminals
 
 import "mauzo/internal/core/authz"
 
-// Terminal permissions (interim: RequireUserRole enforces them). Platform
-// variants are registered for Phase 6 device administration.
+// Terminal permissions.
 const (
 	PermTerminalView       = "terminals.terminal.view"
 	PermTerminalManage     = "terminals.terminal.manage"
@@ -13,6 +12,11 @@ const (
 )
 
 func init() {
-	authz.Register(PermTerminalView, PermTerminalManage, PermTerminalActivate,
-		PermPlatformTermView, PermPlatformTermManage)
+	authz.Define(
+		authz.Permission{Code: PermTerminalView, Module: "terminals", Description: "View POS terminals"},
+		authz.Permission{Code: PermTerminalManage, Module: "terminals", Description: "Create and edit POS terminals"},
+		authz.Permission{Code: PermTerminalActivate, Module: "terminals", Description: "Issue terminal activation codes", Sensitive: true},
+		authz.Permission{Code: PermPlatformTermView, Description: "View terminal licences"},
+		authz.Permission{Code: PermPlatformTermManage, Description: "Manage terminal licences"},
+	)
 }

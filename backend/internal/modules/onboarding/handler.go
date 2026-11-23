@@ -53,6 +53,7 @@ func (h *Handler) PutBusiness(w http.ResponseWriter, r *http.Request) {
 	}
 	var req BusinessRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	if err := h.svc.SaveBusiness(r.Context(), id, req); err != nil {
@@ -70,6 +71,7 @@ func (h *Handler) PutProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	var req ProfileRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	if err := h.svc.SaveProfile(r.Context(), id, req); err != nil {
@@ -87,6 +89,7 @@ func (h *Handler) PutPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	var req subscriptions.AssignRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	if err := h.svc.SavePlan(r.Context(), id, req.PlanID); err != nil {
@@ -104,6 +107,7 @@ func (h *Handler) PutModules(w http.ResponseWriter, r *http.Request) {
 	}
 	var req ModulesRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	if err := h.svc.SaveModules(r.Context(), id, req); err != nil {
@@ -121,6 +125,7 @@ func (h *Handler) PostBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	var req branches.CreateRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	if _, err := h.svc.SaveBranch(r.Context(), id, req); err != nil {
@@ -138,9 +143,11 @@ func (h *Handler) PutAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	var req AdminRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
-	if err := h.svc.SaveAdmin(r.Context(), id, req); err != nil {
+	actor, _ := identity.ActorFrom(r.Context())
+	if err := h.svc.SaveAdmin(r.Context(), actor, req); err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
@@ -155,6 +162,7 @@ func (h *Handler) PutPreferences(w http.ResponseWriter, r *http.Request) {
 	}
 	var req PreferencesRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	if err := h.svc.SavePreferences(r.Context(), id, req); err != nil {
@@ -172,6 +180,7 @@ func (h *Handler) PostTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 	var req terminals.CreateRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	if _, err := h.svc.SaveTerminal(r.Context(), id, req); err != nil {

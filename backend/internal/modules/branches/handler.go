@@ -27,9 +27,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	out := make([]Response, len(rows))
-	for i, b := range rows {
-		out[i] = ToResponse(b)
+	out := make([]Response, 0, len(rows))
+	for _, b := range rows {
+		if actor.CanAccessBranch(b.ID) { // branch-restricted users see their branches only
+			out = append(out, ToResponse(b))
+		}
 	}
 	httpx.OK(w, out)
 }
@@ -43,6 +45,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	var req CreateRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	b, err := h.svc.Create(r.Context(), actor.TenantID, req)

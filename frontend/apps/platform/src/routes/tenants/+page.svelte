@@ -5,6 +5,8 @@
   import { Button, DataTable, Modal, StatusDot, TextField, toast } from '@mauzo/ui';
   import { formatDate } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
+  import { auth } from '#lib/auth.svelte.ts';
+  import TenantModules from '#lib/TenantModules.svelte';
 
   let rows = $state<Tenant[]>([]);
   let loading = $state(true);
@@ -17,6 +19,9 @@
   let saving = $state(false);
   let formError = $state<string | null>(null);
 
+  let modulesOpen = $state(false);
+  let modulesTarget = $state<Tenant | null>(null);
+
   let editOpen = $state(false);
   let editTarget = $state<Tenant | null>(null);
   let editForm = $state({ name: '', email: '', phone: '' });
@@ -26,7 +31,7 @@
     { key: 'slug', label: 'Sign-in code' },
     { key: 'status', label: 'Status', width: '110px' },
     { key: 'created_at', label: 'Created', width: '130px' },
-    { key: 'actions', label: '', width: '220px', align: 'right' as const },
+    { key: 'actions', label: '', width: '300px', align: 'right' as const },
   ];
 
   async function load() {
@@ -129,6 +134,18 @@
     {:else if col.key === 'created_at'}
       {formatDate(row.created_at)}
     {:else if col.key === 'actions'}
+      {#if auth.can('platform.module.view')}
+        <Button
+          size="sm"
+          variant="ghost"
+          onclick={() => {
+            modulesTarget = row;
+            modulesOpen = true;
+          }}
+        >
+          Modules
+        </Button>
+      {/if}
       <Button size="sm" variant="secondary" onclick={() => openEdit(row)}>Edit</Button>
       {#if row.status === 'active'}
         <Button size="sm" variant="danger" onclick={() => setStatus(row, 'suspend')}>Suspend</Button>
@@ -140,6 +157,8 @@
     {/if}
   {/snippet}
 </DataTable>
+
+<TenantModules bind:open={modulesOpen} tenant={modulesTarget} />
 
 <Modal bind:open={createOpen} title="New tenant" locked={saving}>
   <form

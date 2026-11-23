@@ -21,7 +21,9 @@ type Actor struct {
 	ID        uint64 // platform_users.id or users.id
 	SessionID uint64
 	TenantID  uint64 // 0 for platform actors
-	Role      string // platform role or interim tenant role label
+	Role      string // platform role, or tenant role code
+	RoleID    uint64 // tenant roles.id (0 for platform actors)
+	Access    Access // tenant users only
 }
 
 // IsZero reports whether there is no authenticated actor.

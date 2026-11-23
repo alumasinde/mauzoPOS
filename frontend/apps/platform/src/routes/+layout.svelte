@@ -5,7 +5,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { auth } from '#lib/auth.ts';
+  import { auth } from '#lib/auth.svelte.ts';
 
   let { children } = $props();
 
@@ -18,15 +18,18 @@
     else if (auth.token && path === '/login') goto(resolve('/'));
   });
 
-  const nav = [
+  // perm: shown only when the operator's role grants it (the API enforces).
+  const allNav = [
     { href: '/', label: 'Dashboard' },
-    { href: '/tenants', label: 'Tenants' },
-    { href: '/users', label: 'Platform users' },
-    { href: '/business-types', label: 'Business types' },
-    { href: '/plans', label: 'Plans' },
-    { href: '/audit', label: 'Audit log' },
+    { href: '/tenants', label: 'Tenants', perm: 'platform.tenant.view' },
+    { href: '/users', label: 'Platform users', perm: 'platform.user.view' },
+    { href: '/business-types', label: 'Business types', perm: 'platform.businesstype.view' },
+    { href: '/plans', label: 'Plans', perm: 'platform.subscription.view' },
+    { href: '/modules', label: 'Modules', perm: 'platform.module.view' },
+    { href: '/audit', label: 'Audit log', perm: 'platform.audit.view' },
     { href: '/account', label: 'Account' },
   ] as const;
+  const nav = $derived(allNav.filter((i) => !('perm' in i) || auth.can(i.perm)));
 </script>
 
 {#if !auth.ready}

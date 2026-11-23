@@ -10,8 +10,10 @@ import (
 	"mauzo/internal/core/authz"
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/security"
+	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/tenants"
 	"mauzo/internal/testutil"
+	"mauzo/internal/testutil/rbactest"
 )
 
 var testParams = security.Argon2Params{
@@ -21,7 +23,7 @@ var testParams = security.Argon2Params{
 func newDB(t *testing.T) *sqlx.DB {
 	t.Helper()
 	conn := testutil.DB(t)
-	testutil.Truncate(t, conn, "auth_sessions", "users", "platform_users", "tenants")
+	testutil.Truncate(t, conn, "auth_sessions", "user_branches", "users", "roles", "platform_users", "tenants")
 	return conn
 }
 
@@ -130,8 +132,14 @@ func TestTenantUserCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := NewUserService(NewUserRepo(conn), testParams)
-	u, err := svc.CreateTenantUser(ctx, tn.ID, "Cashier", "C@T.Local", "c1", "password123", UserRoleCashier)
+	rbac := rbactest.Setup(t, conn, nil, NewUserRepo(conn))
+	if err := rbac.Roles.ProvisionTenant(ctx, tn.ID); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewUserService(NewUserRepo(conn), testParams, Deps{
+		Roles: rbac.Roles, Branches: branches.NewService(branches.NewRepo(conn)),
+	})
+	u, err := svc.CreateTenantUser(ctx, tn.ID, "Cashier", "C@T.Local", "c1", "password123", authz.RoleCashier)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -33,7 +33,7 @@ func (h *Handler) LoginPlatform(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.OK(w, loginResponse(res))
+	h.writeLogin(w, r, res)
 }
 
 // LoginTenant handles POST /t/auth/login.
@@ -48,7 +48,7 @@ func (h *Handler) LoginTenant(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.OK(w, loginResponse(res))
+	h.writeLogin(w, r, res)
 }
 
 // VerifyMFA handles POST */auth/mfa/verify.
@@ -63,7 +63,7 @@ func (h *Handler) VerifyMFA(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.OK(w, loginResponse(res))
+	h.writeLogin(w, r, res)
 }
 
 // ForgotPasswordPlatform handles POST /platform/auth/password/forgot.
@@ -121,7 +121,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.OK(w, profileResponse(acct, t))
+	httpx.OK(w, profileResponse(acct, t, actor.Access))
 }
 
 // MFASetup handles POST */auth/mfa/setup.
@@ -223,4 +223,18 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	httpx.OK(w, out)
+}
+
+// writeLogin renders a login/MFA result, resolving the user's access when a
+// full session was issued.
+func (h *Handler) writeLogin(w http.ResponseWriter, r *http.Request, res *LoginResult) {
+	var access identity.Access
+	if !res.MFARequired {
+		var err error
+		if access, err = h.svc.AccessFor(r.Context(), res.Account); err != nil {
+			httpx.WriteError(w, r, err)
+			return
+		}
+	}
+	httpx.OK(w, loginResponse(res, access))
 }

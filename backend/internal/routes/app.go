@@ -18,6 +18,8 @@ import (
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
 	"mauzo/internal/modules/onboarding"
+	"mauzo/internal/modules/registry"
+	"mauzo/internal/modules/roles"
 	"mauzo/internal/modules/settings"
 	"mauzo/internal/modules/subscriptions"
 	"mauzo/internal/modules/system"
@@ -64,6 +66,7 @@ func platformRoutes(r chi.Router, c *app.Container) {
 		auditmod.PlatformRoutes(r, c.AuditLogs)
 		businesstypes.PlatformRoutes(r, c.BusinessTypes)
 		subscriptions.PlatformRoutes(r, c.Plans)
+		registry.PlatformRoutes(r, c.Modules)
 	})
 }
 
@@ -73,8 +76,12 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 	r.Group(func(r chi.Router) {
 		r.Use(mw.Authenticate(c.AuthSvc))
 		r.Use(mw.RequireActor(identity.ActorUser))
+		r.Use(mw.BranchScope(c.BranchSvc))
 		auth.PrivateRoutes(r, c.Auth)
 		auditmod.TenantRoutes(r, c.AuditLogs)
+		registry.TenantRoutes(r, c.Modules)
+		roles.TenantRoutes(r, c.Roles)
+		users.TenantRoutes(r, c.Employees)
 		settings.TenantRoutes(r, c.Settings)
 		branches.TenantRoutes(r, c.Branches)
 		terminals.TenantRoutes(r, c.Terminals)

@@ -22,8 +22,9 @@ var (
 
 // Service owns plan and subscription business rules.
 type Service struct {
-	repo   *Repo
-	trialD time.Duration
+	repo     *Repo
+	trialD   time.Duration
+	onChange []func(tenantID uint64)
 }
 
 // NewService builds a Service. trialDays is applied when a plan is assigned.
@@ -109,6 +110,7 @@ func (s *Service) Assign(ctx context.Context, tenantID uint64, planPublicID stri
 	if err := s.repo.InsertSubscription(ctx, &sub); err != nil {
 		return Subscription{}, err
 	}
+	s.planChanged(tenantID)
 	sub.PlanPublicID = p.PublicID
 	sub.PlanName = p.Name
 	return sub, nil
@@ -128,11 +130,12 @@ func applyRequest(p *Plan, req PlanRequest) error {
 	if name == "" {
 		return httpx.ErrValidation.WithDetails(map[string]any{"name": "required"})
 	}
-	for _, m := range req.Modules {
-		if !modules.Known(m) {
-			return httpx.ErrValidation.WithDetails(map[string]any{"modules": "unknown module " + m})
-		}
+	// A plan always includes the dependencies of the modules it sells.
+	closure, err := modules.Closure(req.Modules)
+	if err != nil {
+		return httpx.ErrValidation.WithDetails(map[string]any{"modules": err.Error()})
 	}
+	req.Modules = closure
 	switch req.BillingInterval {
 	case IntervalMonthly, IntervalYearly:
 	default:

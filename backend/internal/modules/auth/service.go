@@ -7,6 +7,7 @@ import (
 
 	"mauzo/internal/config"
 	"mauzo/internal/core/audit"
+	"mauzo/internal/core/identity"
 	"mauzo/internal/core/mail"
 	"mauzo/internal/core/security"
 )
@@ -20,6 +21,8 @@ type Account struct {
 	Identity      string // email for platform users, email/username for tenant users
 	Email         string // empty when the account has no email (username-only)
 	PasswordHash  *string
+	RoleID        uint64 // tenant roles.id (0 for platform accounts)
+	AllBranches   bool   // tenant users: access to every branch
 	Role          string
 	Status        string
 	TOTPSecret    *string
@@ -98,6 +101,13 @@ type Service struct {
 	webURL      string
 	limiter     *lockout
 	timing      timingEqualiser
+	access      AccessLoader
+}
+
+// AccessLoader resolves a tenant user's permissions, enabled modules and
+// branch access (implemented by modules/roles, cached there).
+type AccessLoader interface {
+	LoadAccess(ctx context.Context, tenantID, userID, roleID uint64, allBranches bool) (identity.Access, error)
 }
 
 // ServiceDeps bundles the stores and helpers a Service needs.
@@ -110,6 +120,7 @@ type ServiceDeps struct {
 	Tenants  tenantStore
 	Mailer   mail.Mailer
 	Audit    *audit.Writer
+	Access   AccessLoader
 }
 
 // NewService builds a Service.
@@ -129,6 +140,7 @@ func NewService(cfg config.Config, deps ServiceDeps) *Service {
 		platformURL: cfg.PlatformAppURL,
 		webURL:      cfg.WebAppURL,
 		limiter:     newLockout(cfg.Auth.LoginMaxAttempts, cfg.Auth.LoginLockout),
+		access:      deps.Access,
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"mauzo/internal/core/authz"
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/identity"
 	"mauzo/internal/core/tenancy"
@@ -61,46 +60,6 @@ func RequireActor(t identity.ActorType) func(http.Handler) http.Handler {
 				return
 			}
 			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// Can allows the request when the platform actor's role grants perm. It panics
-// on unregistered permission strings — that is a programming error caught at
-// boot. Tenant permission checks arrive with the roles table in Phase 3.
-func Can(perm string) func(http.Handler) http.Handler {
-	if !authz.Registered(perm) {
-		panic("middleware: unregistered permission " + perm)
-	}
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			a, ok := identity.ActorFrom(r.Context())
-			if !ok || a.Type != identity.ActorPlatformUser || !authz.PlatformRoleAllows(a.Role, perm) {
-				httpx.WriteError(w, r, httpx.ErrForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// RequireUserRole is the interim tenant-side guard until role/permission
-// tables land in Phase 3. It checks the user's role label.
-func RequireUserRole(roles ...string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			a, ok := identity.ActorFrom(r.Context())
-			if !ok || a.Type != identity.ActorUser {
-				httpx.WriteError(w, r, httpx.ErrForbidden)
-				return
-			}
-			for _, role := range roles {
-				if a.Role == role {
-					next.ServeHTTP(w, r)
-					return
-				}
-			}
-			httpx.WriteError(w, r, httpx.ErrForbidden)
 		})
 	}
 }

@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/jmoiron/sqlx"
 
+	"mauzo/internal/core/authz"
+	"mauzo/internal/core/identity"
 	"mauzo/internal/core/security"
 	coresettings "mauzo/internal/core/settings"
 	"mauzo/internal/modules/branches"
@@ -19,6 +22,7 @@ import (
 	"mauzo/internal/modules/terminals"
 	"mauzo/internal/modules/users"
 	"mauzo/internal/testutil"
+	"mauzo/internal/testutil/rbactest"
 )
 
 type fakeRevoker struct{}
@@ -31,7 +35,7 @@ func setup(t *testing.T) (*onboarding.Service, *sqlx.DB, uint64) {
 	testutil.Truncate(t, conn,
 		"pos_terminals", "branches", "tenant_modules", "tenant_settings",
 		"tenant_subscriptions", "plans", "business_profiles", "business_types",
-		"users", "tenants")
+		"user_branches", "users", "roles", "tenants")
 	ctx := context.Background()
 
 	// Reference data normally seeded by seeds/catalogue.go.
@@ -52,7 +56,7 @@ func setup(t *testing.T) (*onboarding.Service, *sqlx.DB, uint64) {
 		 VALUES (?, ?, 'Standard', 1, ?)`, security.NewPublicID(), typeID, def); err != nil {
 		t.Fatal(err)
 	}
-	mods, _ := json.Marshal([]string{"dashboard", "settings", "sales", "payments", "weighing_scales", "reports"})
+	mods, _ := json.Marshal([]string{"dashboard", "settings", "catalog", "sales", "payments", "weighing_scales", "reports"})
 	if _, err := conn.ExecContext(ctx,
 		`INSERT INTO plans (public_id, name, price_kes, billing_interval, modules, is_active, sort)
 		 VALUES (?, 'Starter', 1500, 'monthly', ?, 1, 1)`, security.NewPublicID(), mods); err != nil {
@@ -62,14 +66,20 @@ func setup(t *testing.T) (*onboarding.Service, *sqlx.DB, uint64) {
 	tRepo := tenants.NewRepo(conn)
 	tenantSvc := tenants.NewService(tRepo, fakeRevoker{})
 	settingsStore := coresettings.NewStore(conn)
-	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc)
 	planSvc := subscriptions.NewService(subscriptions.NewRepo(conn), 14)
+	userRepo := users.NewUserRepo(conn)
+	rbac := rbactest.Setup(t, conn, planSvc, userRepo)
+	planSvc.OnPlanChange(rbac.Registry.Invalidate)
+	tenantSvc.AddProvisioner(rbac.Roles)
+	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc, rbac.Registry)
 	branchSvc := branches.NewService(branches.NewRepo(conn))
 	termSvc := terminals.NewService(terminals.NewRepo(conn), branchSvc)
-	userSvc := users.NewUserService(users.NewUserRepo(conn), security.DefaultArgon2Params)
+	userSvc := users.NewUserService(userRepo, security.DefaultArgon2Params, users.Deps{
+		Roles: rbac.Roles, Branches: branchSvc, Seats: planSvc,
+	})
 	svc := onboarding.NewService(onboarding.Deps{
 		Tenants: tenantSvc, Types: btSvc, Profile: btSvc, Plans: planSvc,
-		Subs: planSvc, Mods: btSvc, Branch: branchSvc, Admins: userSvc,
+		Subs: planSvc, Mods: rbac.Registry, Branch: branchSvc, Admins: userSvc,
 		Prefs: settingsStore, Term: termSvc,
 	})
 
@@ -121,8 +131,11 @@ func TestOnboardingFlow(t *testing.T) {
 	if st.BusinessType == nil || *st.BusinessType != "butchery" {
 		t.Fatalf("business_type not applied: %+v", st)
 	}
-	if len(st.Modules) != 5 {
-		t.Fatalf("expected 5 profile modules, got %v", st.Modules)
+	// Profile modules (+ their dependency catalog) are effective, plus core.
+	for _, want := range []string{"sales", "payments", "weighing_scales", "catalog", "users", "roles"} {
+		if !slices.Contains(st.Modules, want) {
+			t.Fatalf("expected %q after applying the profile, got %v", want, st.Modules)
+		}
 	}
 
 	// Profile defaults land in tenant_settings without overwriting later edits.
@@ -168,8 +181,21 @@ func TestOnboardingFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	st, _ = svc.Current(ctx, tenantID)
-	if len(st.Modules) != 3 {
+	// Effective set = core modules + chosen + dependencies (catalog for sales);
+	// weighing_scales (enabled by the profile) must now be off.
+	for _, want := range []string{"dashboard", "settings", "users", "roles", "sales", "payments", "catalog"} {
+		if !slices.Contains(st.Modules, want) {
+			t.Fatalf("expected %q enabled: %v", want, st.Modules)
+		}
+	}
+	if slices.Contains(st.Modules, "weighing_scales") {
 		t.Fatalf("SetModules should disable others: %v", st.Modules)
+	}
+
+	// Modules outside the plan are refused.
+	if err := svc.SaveModules(ctx, tenantID,
+		onboarding.ModulesRequest{Modules: []string{"restaurant"}}); err == nil {
+		t.Fatal("expected module_not_in_plan")
 	}
 
 	// Unknown module rejected.
@@ -186,7 +212,8 @@ func TestOnboardingFlow(t *testing.T) {
 		t.Fatal("first branch should be main")
 	}
 
-	if err := svc.SaveAdmin(ctx, tenantID, onboarding.AdminRequest{
+	owner := ownerActor(t, conn, tenantID)
+	if err := svc.SaveAdmin(ctx, owner, onboarding.AdminRequest{
 		Name: "Admin", Email: "a@test.local", Password: "password123",
 	}); err != nil {
 		t.Fatal(err)
@@ -306,5 +333,14 @@ func TestSettingsValidation(t *testing.T) {
 	}
 	if string(e.Value) != "80" {
 		t.Fatalf("SetDefaults overwrote explicit value: %s", e.Value)
+	}
+}
+
+// ownerActor builds a signed-in owner for steps that check the actor.
+func ownerActor(t *testing.T, conn *sqlx.DB, tenantID uint64) identity.Actor {
+	t.Helper()
+	return identity.Actor{
+		Type: identity.ActorUser, TenantID: tenantID, Role: "owner",
+		Access: identity.Access{Perms: authz.AllOf(), AllBranches: true},
 	}
 }

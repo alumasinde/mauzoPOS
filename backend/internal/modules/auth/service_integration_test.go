@@ -18,6 +18,7 @@ import (
 	"mauzo/internal/modules/tenants"
 	"mauzo/internal/modules/users"
 	"mauzo/internal/testutil"
+	"mauzo/internal/testutil/rbactest"
 )
 
 type sentMail struct{ to, subject, body string }
@@ -37,6 +38,7 @@ type fixture struct {
 	pUsers  *users.PlatformUserRepo
 	users   *users.UserRepo
 	params  security.Argon2Params
+	rbac    rbactest.Services
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -44,7 +46,7 @@ func newFixture(t *testing.T) *fixture {
 	conn := testutil.DB(t)
 	testutil.Truncate(t, conn,
 		"auth_password_resets", "auth_login_history", "auth_sessions",
-		"users", "platform_users", "tenants", "audit_logs")
+		"user_branches", "users", "roles", "platform_users", "tenants", "audit_logs")
 
 	params := security.Argon2Params{MemoryKB: 8192, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}
 	mailer := &fakeMailer{}
@@ -62,6 +64,7 @@ func newFixture(t *testing.T) *fixture {
 	pUserRepo := users.NewPlatformUserRepo(conn)
 	userRepo := users.NewUserRepo(conn)
 	auditW := audit.NewWriter(conn, slog.Default())
+	rbac := rbactest.Setup(t, conn, nil, userRepo)
 	svc := NewService(cfg, ServiceDeps{
 		Sessions: NewSessionRepo(conn),
 		History:  NewHistoryRepo(conn),
@@ -71,9 +74,10 @@ func newFixture(t *testing.T) *fixture {
 		Tenants:  NewTenantStore(tenantRepo),
 		Mailer:   mailer,
 		Audit:    auditW,
+		Access:   rbac.Access,
 	})
 	svc.params = params
-	return &fixture{svc, mailer, conn, tenantRepo, pUserRepo, userRepo, params}
+	return &fixture{svc, mailer, conn, tenantRepo, pUserRepo, userRepo, params, rbac}
 }
 
 func (f *fixture) platformUser(t *testing.T, email, password string) {
@@ -101,13 +105,20 @@ func (f *fixture) tenantWithUser(t *testing.T, slug, email, password string) ten
 	if err := f.tenants.Create(ctx, &tn); err != nil {
 		t.Fatal(err)
 	}
+	if err := f.rbac.Roles.ProvisionTenant(ctx, tn.ID); err != nil {
+		t.Fatal(err)
+	}
+	ownerRole, err := f.rbac.Roles.RoleIDByCode(ctx, tn.ID, "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
 	hash, err := f.params.HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 	u := users.User{
 		TenantID: tn.ID, PublicID: security.NewPublicID(), Name: "Owner",
-		Email: &email, PasswordHash: &hash, Role: "owner", Status: "active",
+		Email: &email, PasswordHash: &hash, RoleID: ownerRole, AllBranches: true, Status: "active",
 	}
 	if err := f.users.Create(ctx, &u); err != nil {
 		t.Fatal(err)

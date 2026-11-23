@@ -5,7 +5,7 @@
   import { Button, DataTable, MfaPanel, StatusDot, toast } from '@mauzo/ui';
   import { formatDate, formatTime } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
-  import { auth, AUTH_BASE } from '#lib/auth.ts';
+  import { auth, AUTH_BASE } from '#lib/auth.svelte.ts';
 
   let sessions = $state<SessionInfo[]>([]);
   let history = $state<LoginHistoryEntry[]>([]);

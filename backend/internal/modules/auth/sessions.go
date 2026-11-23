@@ -47,13 +47,35 @@ func (s *Service) Authenticate(ctx context.Context, token string) (identity.Acto
 	if sess.LastUsedAt == nil || time.Since(*sess.LastUsedAt) > time.Minute {
 		_ = s.sessions.Touch(ctx, sess.ID)
 	}
-	return identity.Actor{
+	actor := identity.Actor{
 		Type:      identity.ActorType(sess.ActorType),
 		ID:        acct.ID,
 		SessionID: sess.ID,
 		TenantID:  acct.TenantID,
 		Role:      acct.Role,
-	}, nil
+		RoleID:    acct.RoleID,
+	}
+	if actor.Type == identity.ActorUser {
+		if actor.Access, err = s.AccessFor(ctx, acct); err != nil {
+			return identity.Actor{}, err
+		}
+	}
+	return actor, nil
+}
+
+// AccessFor resolves a tenant account's access (empty for platform accounts
+// or when no loader is configured, which denies every tenant permission).
+func (s *Service) AccessFor(ctx context.Context, acct Account) (identity.Access, error) {
+	if acct.TenantID == 0 || s.access == nil {
+		return identity.Access{}, nil
+	}
+	return s.access.LoadAccess(ctx, acct.TenantID, acct.ID, acct.RoleID, acct.AllBranches)
+}
+
+// RevokeUserSessions signs a tenant user out everywhere (employee disabled,
+// role or password changed by an administrator).
+func (s *Service) RevokeUserSessions(ctx context.Context, userID uint64) error {
+	return s.sessions.RevokeAllForActor(ctx, string(identity.ActorUser), userID, 0)
 }
 
 // Logout revokes the actor's current session.

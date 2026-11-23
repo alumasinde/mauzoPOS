@@ -2,16 +2,7 @@ package users
 
 import "time"
 
-// Tenant user (employee) interim roles until the roles table lands in Phase 3.
-const (
-	UserRoleOwner      = "owner"
-	UserRoleAdmin      = "admin"
-	UserRoleManager    = "manager"
-	UserRoleSupervisor = "supervisor"
-	UserRoleCashier    = "cashier"
-)
-
-// User is a tenant employee.
+// User is a tenant employee. Role and RoleName are joined from roles.
 type User struct {
 	ID            uint64     `db:"id"`
 	TenantID      uint64     `db:"tenant_id"`
@@ -21,7 +12,11 @@ type User struct {
 	Username      *string    `db:"username"`
 	PasswordHash  *string    `db:"password_hash"`
 	PINHash       *string    `db:"pin_hash"`
+	RoleID        uint64     `db:"role_id"`
 	Role          string     `db:"role"`
+	RoleName      string     `db:"role_name"`
+	RolePublicID  string     `db:"role_public_id"`
+	AllBranches   bool       `db:"all_branches"`
 	Status        string     `db:"status"`
 	TOTPSecret    *string    `db:"totp_secret"`
 	TOTPEnabled   bool       `db:"totp_enabled"`
@@ -29,4 +24,6 @@ type User struct {
 	LastLoginAt   *time.Time `db:"last_login_at"`
 	CreatedAt     time.Time  `db:"created_at"`
 	UpdatedAt     time.Time  `db:"updated_at"`
+
+	BranchIDs []uint64 `db:"-"`
 }

@@ -34,8 +34,8 @@ func TestLockoutStaysBounded(t *testing.T) {
 }
 
 func TestLockoutPruneKeepsActiveLocks(t *testing.T) {
-	l := newLockout(1, time.Minute)
-	l.fail("victim") // locks immediately
+	l := newLockout(1, time.Hour) // long window: slow machines must not expire it
+	l.fail("victim")              // locks immediately
 	for i := range lockoutMaxEntries + 10 {
 		l.fail(fmt.Sprintf("spray-%d", i))
 	}

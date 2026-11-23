@@ -5,7 +5,7 @@
   import { StatusDot } from '@mauzo/ui';
   import { resolve } from '$app/paths';
   import { api } from '#lib/api.ts';
-  import { auth } from '#lib/auth.ts';
+  import { auth } from '#lib/auth.svelte.ts';
 
   let health = $state<HealthStatus | null>(null);
   let error = $state<string | null>(null);

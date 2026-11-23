@@ -3,7 +3,7 @@
   import { Button, TextField } from '@mauzo/ui';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { auth } from '#lib/auth.ts';
+  import { auth } from '#lib/auth.svelte.ts';
   import { onMount } from 'svelte';
 
   let slug = $state('');

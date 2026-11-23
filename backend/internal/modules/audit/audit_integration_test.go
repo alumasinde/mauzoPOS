@@ -14,7 +14,7 @@ import (
 
 func TestWriteAndList(t *testing.T) {
 	conn := testutil.DB(t)
-	testutil.Truncate(t, conn, "audit_logs", "tenants")
+	testutil.Truncate(t, conn, "audit_logs", "roles", "tenants")
 	ctx := context.Background()
 
 	tn := tenants.Tenant{PublicID: security.NewPublicID(), Name: "Auditee", Slug: "aud", Status: tenants.StatusActive}

@@ -54,8 +54,16 @@ func (s *Service) Count(ctx context.Context, tenantID uint64) (int, error) {
 	return s.repo.Count(ctx, tenantID)
 }
 
+// ErrBranchForbidden rejects terminals at branches the user cannot access.
+var ErrBranchForbidden = httpx.NewError(403, "branch_forbidden", "You do not have access to that branch.")
+
 // Create registers a pending terminal at a tenant-owned branch.
 func (s *Service) Create(ctx context.Context, tenantID uint64, req CreateRequest) (Terminal, error) {
+	return s.CreateAt(ctx, tenantID, req, nil)
+}
+
+// CreateAt is Create with a branch-access check (allow == nil skips it).
+func (s *Service) CreateAt(ctx context.Context, tenantID uint64, req CreateRequest, allow func(branchID uint64) bool) (Terminal, error) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return Terminal{}, httpx.ErrValidation.WithDetails(map[string]any{"name": "required"})
@@ -63,6 +71,9 @@ func (s *Service) Create(ctx context.Context, tenantID uint64, req CreateRequest
 	branchID, err := s.branches.BranchByPublicID(ctx, tenantID, req.BranchID)
 	if err != nil {
 		return Terminal{}, ErrInvalidBranch
+	}
+	if allow != nil && !allow(branchID) {
+		return Terminal{}, ErrBranchForbidden
 	}
 	t := Terminal{
 		TenantID: tenantID, BranchID: branchID,

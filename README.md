@@ -79,7 +79,7 @@ mauzoPOS/
 │   │   └── modules/             # ONE folder per business module (see §3)
 │   │       ├── tenants/
 │   │       ├── businesstypes/
-│   │       ├── registry/        # module registry + feature flags
+│   │       ├── registry/        # module enablement, plan gating, navigation
 │   │       ├── auth/
 │   │       ├── users/
 │   │       ├── roles/
@@ -207,20 +207,42 @@ func Routes(r chi.Router, h *Handlers) {
 
 ---
 
-## 4. Permissions model
+## 4. Modules, permissions & roles
 
-- Format: `module.resource.action`. Examples: `sales.refund.create`, `catalog.product.update`.
-  Platform permissions use the `platform.` prefix and only exist in the platform auth context.
-- Each module declares its permissions in `permissions.go`. At startup they register into
-  `core/authz`, and `migrate seed` syncs them to the DB. **Unknown permission strings fail at boot.**
-- Roles are rows in the database, and each tenant can customise them. Default role templates
-  (Owner, Administrator, Manager, Accountant, Inventory Manager, Supervisor, Cashier) are
-  seeded per tenant from `seeds/roles`.
-- Permissions marked **`sensitive`** (refunds, voids, price overrides, discounts above a
-  threshold, cash adjustments, drawer open) need a supervisor PIN at the POS when the cashier
-  lacks them. They always write an audit entry.
-- Checks run in this order: authenticated → tenant active → **module enabled for tenant** →
-  **branch access** → **permission**.
+See [ADR 0001](docs/adr/0001-module-registry-and-rbac.md) for the full design.
+
+- **Modules** are defined in `core/modules/catalogue.go`. Each has a code, dependencies, a config
+  schema, sidebar `Nav` entries, and the business types it is recommended for. Feature code asks
+  whether a module is enabled (`mw.RequireModule`, `actor.HasModule`) and **never checks business
+  types**.
+- **Effective modules** for a tenant are: core modules, plus the tenant's enabled modules, limited to
+  what its plan allows (unless the platform overrode it) and what is switched on platform-wide.
+  Enabling a module pulls in its dependencies. Disabling one that others need requires `cascade`.
+- **Permissions** use the format `module.resource.action`. Each module declares its own in
+  `permissions.go` with `authz.Define(...)`, including the module that gates it and whether it is
+  `Sensitive`.
+  - **Boot sync:** the API mirrors the registry into the `permissions` table at boot (`migrate seed`
+    does too). This is refused unless `modules/registerall` is linked. **Add every new module there.**
+  - **Unknown strings** passed to `mw.Can(...)` panic at boot.
+- **Roles** are rows per tenant. Seven built-in roles come from `authz.RoleTemplates` and follow their
+  template until a tenant edits them, so new permissions in later releases reach them automatically.
+  - **Owner** is locked and holds everything. The last active owner is protected.
+  - **No escalation:** you can only grant, assign or manage what you hold yourself.
+- **Branch access:** each employee has all branches or a list. Send `X-Branch-Id` to scope a request,
+  and filter branch-bound lists with `actor.CanAccessBranch`.
+- **Sensitive** permissions always write an audit entry and, at the POS, need a supervisor PIN when the
+  cashier lacks them.
+- **Check order:** authenticated → tenant active → account active → **module enabled** →
+  **permission** → **branch access**. All checks run in the backend; `/me` returns the effective
+  permissions and modules only so the UI can hide controls.
+
+### Adding a feature module (checklist)
+
+1. Add the module to `core/modules/catalogue.go` (deps, config schema, `Nav` only once its page exists).
+2. Create `internal/modules/<name>/permissions.go` with `authz.Define(...)` and the right `Module`.
+3. Import the package in `internal/modules/registerall`.
+4. Guard routes with `mw.Can(Perm...)`, which also enforces the module.
+5. Add the page to the web app's `ROUTES` list in `+layout.svelte`.
 
 The full catalogue is in [docs/permissions.md](docs/permissions.md).
 

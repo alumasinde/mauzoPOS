@@ -5,9 +5,22 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { auth } from '#lib/auth.ts';
+  import { auth } from '#lib/auth.svelte.ts';
+  import { nav } from '#lib/nav.svelte.ts';
 
   let { children } = $props();
+
+  // Pages this app ships. Server nav entries for anything else are ignored,
+  // so a module can never link to a screen that does not exist yet.
+  const ROUTES = ['/', '/onboarding', '/modules', '/settings', '/audit', '/employees', '/roles'] as const;
+  type AppRoute = (typeof ROUTES)[number];
+  const isRoute = (p: string): p is AppRoute => (ROUTES as readonly string[]).includes(p);
+
+  // The sidebar follows the user's permissions and the tenant's modules.
+  $effect(() => {
+    if (auth.user) nav.load();
+    else nav.clear();
+  });
 
   onMount(() => auth.init());
 
@@ -17,8 +30,6 @@
     if (!auth.token && !auth.isPublic(path)) goto(resolve('/login'));
     else if (auth.token && path === '/login') goto(resolve('/'));
   });
-
-  const canAudit = $derived(auth.user?.role === 'owner' || auth.user?.role === 'admin');
 </script>
 
 {#if !auth.ready}
@@ -33,12 +44,11 @@
         <span>{auth.user?.tenant?.name ?? 'Back office'}</span>
       </div>
       <nav>
-        <a href={resolve('/')} class:active={page.url.pathname === '/'}>Dashboard</a>
-        {#if canAudit}
-          <a href={resolve('/onboarding')} class:active={page.url.pathname === '/onboarding'}>Setup</a>
-          <a href={resolve('/settings')} class:active={page.url.pathname === '/settings'}>Settings</a>
-          <a href={resolve('/audit')} class:active={page.url.pathname === '/audit'}>Audit log</a>
-        {/if}
+        {#each nav.items as item (item.key)}
+          {#if isRoute(item.path)}
+            <a href={resolve(item.path)} class:active={page.url.pathname === item.path}>{item.label}</a>
+          {/if}
+        {/each}
         <a href={resolve('/account')} class:active={page.url.pathname === '/account'}>Account</a>
       </nav>
     </aside>

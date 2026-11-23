@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"mauzo/internal/core/httpx"
+	"mauzo/internal/core/identity"
 	coresettings "mauzo/internal/core/settings"
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
@@ -93,7 +94,7 @@ type BranchMaker interface {
 
 // AdminMaker creates an extra tenant admin/employee.
 type AdminMaker interface {
-	CreateTenantUser(ctx context.Context, tenantID uint64, name, email, username, password, role string) (users.User, error)
+	CreateTenantUserAs(ctx context.Context, actor identity.Actor, name, email, username, password, role string) (users.User, error)
 }
 
 // PreferenceWriter writes one settings key.
@@ -285,18 +286,15 @@ type AdminRequest struct {
 }
 
 // SaveAdmin creates an additional employee; empty request skips the step.
-func (s *Service) SaveAdmin(ctx context.Context, tenantID uint64, req AdminRequest) error {
+// The actor may only create a role whose permissions they hold.
+func (s *Service) SaveAdmin(ctx context.Context, actor identity.Actor, req AdminRequest) error {
 	if req.Name != "" || req.Email != "" {
-		role := req.Role
-		if role == "" {
-			role = users.UserRoleAdmin
-		}
-		if _, err := s.deps.Admins.CreateTenantUser(ctx, tenantID,
-			req.Name, req.Email, req.Username, req.Password, role); err != nil {
+		if _, err := s.deps.Admins.CreateTenantUserAs(ctx, actor,
+			req.Name, req.Email, req.Username, req.Password, req.Role); err != nil {
 			return err
 		}
 	}
-	return s.advance(ctx, tenantID, StepAdmin)
+	return s.advance(ctx, actor.TenantID, StepAdmin)
 }
 
 // PreferencesRequest is step 7 — arbitrary validated settings.

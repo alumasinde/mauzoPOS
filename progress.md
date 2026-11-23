@@ -19,7 +19,7 @@ column is ✅ and docs are updated).
 | 0 | Project foundation & tooling | 🟡 (CI not yet run — no remote) |
 | 1 | Platform foundation, tenants & authentication | ✅ |
 | 2 | Business profiles & onboarding | ✅ |
-| 3 | Module registry & permissions | ⬜ |
+| 3 | Module registry & permissions | ✅ (platform modules UI not yet clicked through) |
 | 4 | Products, categories & barcodes | ⬜ |
 | 5 | Inventory & pricing | ⬜ |
 | 6 | POS desktop & checkout | ⬜ |
@@ -102,16 +102,16 @@ column is ✅ and docs are updated).
 
 | Feature | DB | API | UI | Tests | Status |
 |---|---|---|---|---|---|
-| Module registry (id, deps, permissions, config schema, availability, plan) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Dependency resolution on enable/disable | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Tenant module overrides + config | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| `RequireModule` middleware (backend enforcement) | ➖ | ⬜ | ➖ | ⬜ | ⬜ |
-| Permission registry (`permissions.go` per module → DB sync, boot validation) | ⬜ | ⬜ | ➖ | ⬜ | ⬜ |
-| Roles CRUD + default role templates per tenant | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| `Can(perm)` middleware + branch-scope check | ➖ | ⬜ | ➖ | ⬜ | ⬜ |
-| Employees: CRUD, roles, branch assignment | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Dynamic navigation API (modules × permissions) | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Platform: module & feature management screen | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Module registry (id, deps, permissions, config schema, availability, plan) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Dependency resolution on enable/disable | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Tenant module overrides + config | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `RequireModule` middleware (backend enforcement) | ➖ | ✅ | ➖ | ✅ | ✅ |
+| Permission registry (`permissions.go` per module → DB sync, boot validation) | ✅ | ✅ | ➖ | ✅ | ✅ |
+| Roles CRUD + default role templates per tenant | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `Can(perm)` middleware + branch-scope check | ➖ | ✅ | ➖ | ✅ | ✅ |
+| Employees: CRUD, roles, branch assignment | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Dynamic navigation API (modules × permissions) | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Platform: module & feature management screen | ➖ | ✅ | 🟡 | ✅ | 🟡 (built + type-checked, not yet clicked through) |
 
 ## Phase 4 — Products, categories & barcodes
 
@@ -334,3 +334,4 @@ column is ✅ and docs are updated).
 | 2026-11-23 | Phase 1 completed: `MfaPanel` (shared TOTP setup/disable, recovery codes) + Account page (sessions list + revoke, sign-in history) in both apps; tenant edit modal (PATCH); integration tests for tenants/users/audit; `testutil` serialized on a MySQL named lock to stop cross-package truncation races; `audit.Log.Data` NULL-scan fix. |
 | 2026-11-23 | Phase 2: migrations 00005–00007 (business_types/profiles, plans/tenant_subscriptions, tenant cols + tenant_settings + tenant_modules + branches + pos_terminals); `core/modules` catalogue, `core/settings` key/value store + JSON-schema validator; modules businesstypes (profile CRUD + idempotent apply engine), subscriptions (plan CRUD + assign/cancel + trial), settings (`/t/settings`), branches + terminals (minimal create/list), onboarding (8-step wizard state machine: business → profile → plan → modules → branch → admin → preferences → terminal → complete, guard: branch+terminal required); `ONBOARDING_TRIAL_DAYS` config; catalogue seed (7 business types + default profiles, 3 plans); platform UI (Business types, Plans); web UI (onboarding wizard `/onboarding`, `/settings`, dashboard banner). Integration test walks the whole wizard against `mauzo_test`. Verified live: full wizard run end-to-end on demo tenant. `golangci-lint` 0 issues, all tests green, frontend check/lint/build green. |
 | 2026-11-23 | Review fixes. **Auth:** MFA tickets revoked after `LOGIN_MAX_ATTEMPTS` bad codes and redeemable once (conditional `MarkMFAVerified`); password checked before account/tenant status; argon2 timing equaliser for unknown/PIN-only identities; lockout map pruned and bounded; reset tokens consumed atomically before the password change; reset mail goes to `Account.Email` only (username-only/PIN-only accounts skipped). **Users:** usernames may not contain `@`, emails must. **Tests:** `testutil` refuses a `TEST_DB_NAME` equal to `DB_NAME` or without "test". **Profiles:** `Apply` and profile save run in transactions, DB errors no longer reported as 404, `SetDefaults` no longer uses `INSERT IGNORE`. **DB:** migration 00008 composite FK `pos_terminals(tenant_id, branch_id) → branches(tenant_id, id)` (validated up/down on `mauzo_test`, applied to dev). Build + vet clean; tests not run (new `lockout_test.go` included). |
+| 2026-11-23 | Phase 3: module registry (`core/modules`: deps, config schemas, nav; `modules` + `tenant_modules.source`; effective = core ∪ enabled ∩ plan ∩ platform-active, dependency closure, cascade disable, plan downgrade hides). Permission metadata + `permissions` table synced at boot (guarded by `registerall`). Tenant roles + `role_permissions`, 7 templates that auto-follow until customised, locked owner, no-escalation everywhere. Employees CRUD with role, branch access (`user_branches`), PIN (argon2id), seat limit, last-owner/self guards, session revoke. `Can()` = module + permission, `RequireModule`, `BranchScope` (`X-Branch-Id`); `RequireUserRole` removed. `/me` returns permissions/modules; `GET /t/navigation`. Web: dynamic sidebar, Employees, Roles (permission picker), Modules (config forms); platform: Modules page + per-tenant overrides. Migrations 00009 (RBAC) + 00010 (Go backfill: system roles, `users.role` → `role_id`) validated up/down on `mauzo_test`, **not yet applied to dev**. Also fixed: 15 handlers ignoring JSON decode errors, onboarding admin-step role escalation, apps crashing on load (`auth.ts` used `$state` → `auth.svelte.ts`), lockout prune O(n²). ADR 0001. All Go tests pass; svelte-check/eslint/prettier clean. |

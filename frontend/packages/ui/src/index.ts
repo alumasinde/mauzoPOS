@@ -9,3 +9,6 @@ export { default as MfaPanel } from './MfaPanel.svelte';
 export { toast, toasts, dismissToast } from './toast.svelte';
 export type { Toast, ToastKind } from './toast.svelte';
 export type { Column } from './types';
+export { default as Badge } from './Badge.svelte';
+export { default as Switch } from './Switch.svelte';
+export { default as Pager } from './Pager.svelte';

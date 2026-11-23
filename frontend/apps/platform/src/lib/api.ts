@@ -1,5 +1,5 @@
 import { createClient } from '@mauzo/api-client';
-import { auth } from './auth';
+import { auth } from './auth.svelte';
 
 /** Empty base URL = same origin (Vite proxy in dev, nginx in production). */
 export const api = createClient({

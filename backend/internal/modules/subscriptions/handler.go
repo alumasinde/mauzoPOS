@@ -34,6 +34,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req PlanRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	p, err := h.svc.Create(r.Context(), req)
@@ -48,6 +49,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	var req PlanRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	p, err := h.svc.Update(r.Context(), chi.URLParam(r, "id"), req)

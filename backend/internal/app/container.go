@@ -20,6 +20,9 @@ import (
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
 	"mauzo/internal/modules/onboarding"
+	_ "mauzo/internal/modules/registerall" // complete permission registry
+	"mauzo/internal/modules/registry"
+	"mauzo/internal/modules/roles"
 	"mauzo/internal/modules/settings"
 	"mauzo/internal/modules/subscriptions"
 	"mauzo/internal/modules/system"
@@ -39,14 +42,18 @@ type Container struct {
 	RateLimiter *middleware.RateLimiter
 	Audit       *audit.Writer
 
-	// Auth service is shared by routes (Authenticate middleware) and handlers.
-	AuthSvc *auth.Service
+	// Services shared by routes (middleware) and boot tasks.
+	AuthSvc     *auth.Service
+	RoleSvc     *roles.Service
+	RegistrySvc *registry.Service
+	BranchSvc   *branches.Service
 
 	// Module handlers (one field per module).
 	System        *system.Handler
 	Auth          *auth.Handler
 	Tenants       *tenants.Handler
 	PlatformUsers *users.PlatformUserHandler
+	Employees     *users.EmployeeHandler
 	AuditLogs     *auditmod.Handler
 	BusinessTypes *businesstypes.Handler
 	Plans         *subscriptions.Handler
@@ -54,9 +61,11 @@ type Container struct {
 	Branches      *branches.Handler
 	Terminals     *terminals.Handler
 	Onboarding    *onboarding.Handler
+	Roles         *roles.Handler
+	Modules       *registry.Handler
 }
 
-// NewContainer builds the logger, database pool and module handlers from cfg.
+// NewContainer builds the logger, database pool and module services.
 func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	log := logger.New(cfg.Log.Level, cfg.IsDevelopment())
 	slog.SetDefault(log)
@@ -74,6 +83,14 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	platformUserRepo := users.NewPlatformUserRepo(conn)
 	userRepo := users.NewUserRepo(conn)
 
+	// Plans gate modules; module enablement and roles feed per-request access.
+	planSvc := subscriptions.NewService(subscriptions.NewRepo(conn), cfg.Onboarding.TrialDays)
+	registrySvc := registry.NewService(registry.NewRepo(conn), planSvc)
+	planSvc.OnPlanChange(registrySvc.Invalidate)
+	roleRepo := roles.NewRepo(conn)
+	accessSvc := roles.NewAccessService(roleRepo, registrySvc, userRepo)
+	roleSvc := roles.NewService(roleRepo, accessSvc)
+
 	authSvc := auth.NewService(cfg, auth.ServiceDeps{
 		Sessions: auth.NewSessionRepo(conn),
 		History:  auth.NewHistoryRepo(conn),
@@ -83,23 +100,25 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Tenants:  auth.NewTenantStore(tenantRepo),
 		Mailer:   mailer,
 		Audit:    auditW,
+		Access:   accessSvc,
 	})
 
-	// Phase 2 services.
 	tenantSvc := tenants.NewService(tenantRepo, authSvc)
+	tenantSvc.AddProvisioner(roleSvc)
 	settingsStore := coresettings.NewStore(conn)
-	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc)
-	planSvc := subscriptions.NewService(subscriptions.NewRepo(conn), cfg.Onboarding.TrialDays)
+	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc, registrySvc)
 	branchSvc := branches.NewService(branches.NewRepo(conn))
 	terminalSvc := terminals.NewService(terminals.NewRepo(conn), branchSvc)
-	userSvc := users.NewUserService(userRepo, params)
+	userSvc := users.NewUserService(userRepo, params, users.Deps{
+		Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc,
+	})
 	onbSvc := onboarding.NewService(onboarding.Deps{
 		Tenants: tenantSvc,
 		Types:   btSvc,
 		Profile: btSvc,
 		Plans:   planSvc,
 		Subs:    planSvc,
-		Mods:    btSvc,
+		Mods:    registrySvc,
 		Branch:  branchSvc,
 		Admins:  userSvc,
 		Prefs:   settingsStore,
@@ -113,11 +132,15 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		RateLimiter: middleware.NewRateLimiter(cfg.HTTP.RateLimitRPS, cfg.HTTP.RateLimitBurst),
 		Audit:       auditW,
 		AuthSvc:     authSvc,
+		RoleSvc:     roleSvc,
+		RegistrySvc: registrySvc,
+		BranchSvc:   branchSvc,
 		System:      system.NewHandler(Version, map[string]system.Pinger{"database": conn}),
 		Auth:        auth.NewHandler(authSvc, auditW),
 		Tenants:     tenants.NewHandler(tenantSvc, auditW),
 		PlatformUsers: users.NewPlatformUserHandler(
 			users.NewPlatformUserService(platformUserRepo, params), auditW),
+		Employees:     users.NewEmployeeHandler(userSvc, auditW),
 		AuditLogs:     auditmod.NewHandler(auditmod.NewRepo(conn)),
 		BusinessTypes: businesstypes.NewHandler(btSvc),
 		Plans:         subscriptions.NewHandler(planSvc),
@@ -125,6 +148,8 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Branches:      branches.NewHandler(branchSvc),
 		Terminals:     terminals.NewHandler(terminalSvc),
 		Onboarding:    onboarding.NewHandler(onbSvc),
+		Roles:         roles.NewHandler(roleSvc, auditW),
+		Modules:       registry.NewHandler(registrySvc, tenantSvc, auditW),
 	}, nil
 }
 

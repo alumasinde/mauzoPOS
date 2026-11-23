@@ -93,6 +93,8 @@ func tenantAccount(u users.User) Account {
 		Identity:      ident,
 		Email:         email,
 		PasswordHash:  u.PasswordHash,
+		RoleID:        u.RoleID,
+		AllBranches:   u.AllBranches,
 		Role:          u.Role,
 		Status:        u.Status,
 		TOTPSecret:    u.TOTPSecret,

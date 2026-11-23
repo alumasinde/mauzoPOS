@@ -49,6 +49,7 @@ func (h *Handler) ListProfiles(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 	var req ProfileRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	p, err := h.svc.CreateProfile(r.Context(), req)
@@ -63,6 +64,7 @@ func (h *Handler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	var req ProfileRequest
 	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
 		return
 	}
 	p, err := h.svc.UpdateProfile(r.Context(), chi.URLParam(r, "id"), req)

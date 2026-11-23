@@ -7,11 +7,13 @@
     /** Prevent closing via Esc/backdrop (e.g. while saving). */
     locked?: boolean;
     onclose?: () => void;
+    /** md (default, 560px) or lg (800px) for dense editors. */
+    size?: 'md' | 'lg';
     children: Snippet;
     footer?: Snippet;
   }
 
-  let { open = $bindable(), title, locked = false, onclose, children, footer }: Props = $props();
+  let { open = $bindable(), title, locked = false, onclose, size = 'md', children, footer }: Props = $props();
   let dialog = $state<HTMLDialogElement>();
 
   $effect(() => {
@@ -29,6 +31,7 @@
 
 <dialog
   bind:this={dialog}
+  class={size}
   aria-labelledby="modal-title"
   oncancel={(e) => {
     e.preventDefault();
@@ -55,6 +58,10 @@
     color: var(--color-text);
     box-shadow: var(--shadow-lg);
     width: min(560px, calc(100vw - 32px));
+    overflow-x: hidden;
+  }
+  dialog.lg {
+    width: min(800px, calc(100vw - 32px));
   }
   dialog::backdrop {
     background: rgb(8 12 24 / 0.55);

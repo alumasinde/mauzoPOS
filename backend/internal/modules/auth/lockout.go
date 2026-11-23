@@ -12,6 +12,9 @@ import (
 const (
 	lockoutPruneAt    = 10_000
 	lockoutMaxEntries = 100_000
+	// Pruning scans the whole map, so it runs at most once per interval;
+	// otherwise a flood of locked keys would make every attempt O(n).
+	lockoutPruneEvery = time.Second
 )
 
 // lockout is an in-memory failed-attempt limiter keyed by actor type +
@@ -22,6 +25,7 @@ type lockout struct {
 	maxFails int
 	window   time.Duration
 	entries  map[string]*lockoutEntry
+	pruned   time.Time
 }
 
 type lockoutEntry struct {
@@ -51,10 +55,16 @@ func (l *lockout) fail(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
-	if len(l.entries) >= lockoutPruneAt {
+	if len(l.entries) >= lockoutPruneAt && now.Sub(l.pruned) >= lockoutPruneEvery {
 		l.prune(now)
+		l.pruned = now
 	}
 	e, ok := l.entries[key]
+	if !ok && len(l.entries) >= lockoutMaxEntries {
+		// Full of live entries: stop tracking new keys rather than grow.
+		// Per-IP rate limiting still applies to these requests.
+		return false
+	}
 	if !ok || now.Sub(e.firstFailAt) > l.window {
 		e = &lockoutEntry{firstFailAt: now, lockedUntil: e.lockedUntilOrZero()}
 		l.entries[key] = e

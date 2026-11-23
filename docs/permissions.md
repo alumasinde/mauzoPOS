@@ -11,6 +11,21 @@ permission can perform it only after a supervisor enters a PIN.
 Standard actions: `view`, `create`, `update`, `delete` (soft-delete or deactivate only),
 `export`, `approve`.
 
+**How enforcement works (Phase 3):**
+- **Declaration:** each permission is declared with `authz.Define(Permission{Code, Module,
+  Description, Sensitive})`.
+- **Module gating:** a tenant permission takes effect only while its module is enabled for the
+  tenant. `Can()` answers `module_disabled` (403) when the module is off, and `forbidden` (403) when
+  the role lacks the permission.
+- **Roles:** roles are stored per tenant (`roles`, `role_permissions`). The owner role is locked and
+  holds everything. Other built-in roles follow their template until edited.
+- **No escalation:** you can only grant, assign or manage what you hold yourself. This covers roles,
+  employees and branch access.
+- **Status:** ✅ marks permissions registered in code today. The others are reserved here and get
+  registered by the phase that builds their module.
+
+See [ADR 0001](adr/0001-module-registry-and-rbac.md) for the design.
+
 ---
 
 ## 1. Platform context (`platform.*`) — platform administrators only
@@ -42,10 +57,12 @@ Platform roles: **Super Admin** (all), **Support** (view + impersonate), **Billi
 |---|---|---|---|
 | dashboard | `dashboard.view` | | Business dashboard |
 | settings | `settings.business.view` / `.update` | | Business settings |
-| settings | `settings.module.manage` | S | Enable/disable modules (within plan) |
-| users | `users.employee.view` / `.create` / `.update` / `.deactivate` | | Employees |
-| users | `users.employee.reset_pin` | S | Reset cashier PIN |
-| roles | `roles.role.view` / `.manage` | S | Roles & permission assignment |
+| settings | `settings.module.manage` ✅ | S | Enable/disable and configure modules (within plan) |
+| users | `users.employee.view` / `.create` / `.update` ✅ | | Employees, role and branch access |
+| users | `users.employee.deactivate` ✅ | S | Disable / re-enable employees |
+| users | `users.employee.reset_password` ✅ | S | Set an employee's password (signs them out) |
+| users | `users.employee.reset_pin` ✅ | S | Set an employee's POS PIN |
+| roles | `roles.role.view` ✅ / `.manage` ✅ | S (manage) | Roles & permission assignment |
 | branches | `branches.branch.view` / `.manage` | | Branches & locations |
 | terminals | `terminals.terminal.view` / `.manage` | | POS terminals |
 | terminals | `terminals.terminal.activate` | S | Issue an activation code |

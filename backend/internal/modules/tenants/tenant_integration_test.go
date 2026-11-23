@@ -21,7 +21,7 @@ func (f *fakeRevoker) RevokeAllForTenant(_ context.Context, tenantID uint64) err
 func newSvc(t *testing.T) (*Service, *fakeRevoker, *sqlx.DB) {
 	t.Helper()
 	conn := testutil.DB(t)
-	testutil.Truncate(t, conn, "audit_logs", "auth_sessions", "users", "tenants")
+	testutil.Truncate(t, conn, "audit_logs", "auth_sessions", "user_branches", "users", "roles", "tenants")
 	rev := &fakeRevoker{}
 	return NewService(NewRepo(conn), rev), rev, conn
 }

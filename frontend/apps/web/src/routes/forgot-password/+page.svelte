@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
   import { api } from '#lib/api.ts';
-  import { auth } from '#lib/auth.ts';
+  import { auth } from '#lib/auth.svelte.ts';
 
   let slug = $state('');
   let identity = $state('');

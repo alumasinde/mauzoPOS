@@ -32,5 +32,8 @@ func run() error {
 	}
 	defer func() { _ = c.Close() }()
 
+	if err := c.SyncReferenceData(ctx); err != nil {
+		return err
+	}
 	return app.Serve(ctx, c, routes.New(c))
 }
