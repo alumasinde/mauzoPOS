@@ -18,7 +18,7 @@ column is ✅ and docs are updated).
 |---|---|---|
 | 0 | Project foundation & tooling | 🟡 (CI not yet run — no remote) |
 | 1 | Platform foundation, tenants & authentication | ✅ |
-| 2 | Business profiles & onboarding | ⬜ |
+| 2 | Business profiles & onboarding | ✅ |
 | 3 | Module registry & permissions | ⬜ |
 | 4 | Products, categories & barcodes | ⬜ |
 | 5 | Inventory & pricing | ⬜ |
@@ -87,16 +87,16 @@ column is ✅ and docs are updated).
 
 | Feature | DB | API | UI | Tests | Status |
 |---|---|---|---|---|---|
-| Business types (supermarket, minimart, butchery, grocery, liquor, restaurant, custom) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Business profile templates (default modules, categories, settings, receipt, POS layout) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Profile Engine: apply profile to tenant (idempotent) | ⬜ | ⬜ | ➖ | ⬜ | ⬜ |
-| Subscription plans & tenant subscriptions | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Onboarding wizard step 1–3: business info, type, profile | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Wizard step 4–5: plan, enabled modules | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Wizard step 6–7: branches, initial administrator | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Wizard step 8–10: tax, payment methods, receipt config | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Wizard step 11–12: terminal config, activation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Tenant settings (key/value + JSON-schema validation) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Business types (supermarket, minimart, butchery, grocery, liquor, restaurant, custom) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Business profile templates (default modules, categories, settings, receipt, POS layout) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Profile Engine: apply profile to tenant (idempotent) | ✅ | ✅ | ➖ | ✅ | ✅ |
+| Subscription plans & tenant subscriptions | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Onboarding wizard step 1–3: business info, type, profile | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wizard step 4–5: plan, enabled modules | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wizard step 6–7: branches, initial administrator | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wizard step 8–10: tax, payment methods, receipt config | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wizard step 11–12: terminal config, activation | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Tenant settings (key/value + JSON-schema validation) | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ## Phase 3 — Module registry & permissions
 
@@ -332,3 +332,5 @@ column is ✅ and docs are updated).
 | 2026-11-22 | `golangci-lint run` → 0 issues. Fixed 58 findings: errcheck (deferred `Close`), errorlint (`errors.Is` for `http.ErrAbortHandler`), gocritic exitAfterDefer (`cmd/*` restructured to `run() error`), revive exported doc comments. |
 | 2026-11-23 | Phase 1 (mostly): `core/security` (argon2id, tokens, TOTP, ULID), `core/identity`, `core/authz`, auth middleware, `core/mail`, `core/audit`; migrations 00002–00004 (tenants+slug, auth sessions/history/resets, platform+tenant users); modules tenants/auth/users/audit with platform + tenant auth contexts; foundation seed (`admin@mauzo.local` / `ChangeMe123!`, demo tenant `demo` / `owner@demo.local`); 5 auth integration tests vs `mauzo_test`; platform app (login+MFA challenge, forgot/reset, shell, tenants, users, audit) + web app (slug login+MFA, forgot/reset, shell, audit). Verified live via Vite proxy: platform + tenant login, `/me`. All checks green: `golangci-lint` 0 issues, `go test`, `svelte-check`, eslint+prettier, `pnpm -r build`. |
 | 2026-11-23 | Phase 1 completed: `MfaPanel` (shared TOTP setup/disable, recovery codes) + Account page (sessions list + revoke, sign-in history) in both apps; tenant edit modal (PATCH); integration tests for tenants/users/audit; `testutil` serialized on a MySQL named lock to stop cross-package truncation races; `audit.Log.Data` NULL-scan fix. |
+| 2026-11-23 | Phase 2: migrations 00005–00007 (business_types/profiles, plans/tenant_subscriptions, tenant cols + tenant_settings + tenant_modules + branches + pos_terminals); `core/modules` catalogue, `core/settings` key/value store + JSON-schema validator; modules businesstypes (profile CRUD + idempotent apply engine), subscriptions (plan CRUD + assign/cancel + trial), settings (`/t/settings`), branches + terminals (minimal create/list), onboarding (8-step wizard state machine: business → profile → plan → modules → branch → admin → preferences → terminal → complete, guard: branch+terminal required); `ONBOARDING_TRIAL_DAYS` config; catalogue seed (7 business types + default profiles, 3 plans); platform UI (Business types, Plans); web UI (onboarding wizard `/onboarding`, `/settings`, dashboard banner). Integration test walks the whole wizard against `mauzo_test`. Verified live: full wizard run end-to-end on demo tenant. `golangci-lint` 0 issues, all tests green, frontend check/lint/build green. |
+| 2026-11-23 | Review fixes. **Auth:** MFA tickets revoked after `LOGIN_MAX_ATTEMPTS` bad codes and redeemable once (conditional `MarkMFAVerified`); password checked before account/tenant status; argon2 timing equaliser for unknown/PIN-only identities; lockout map pruned and bounded; reset tokens consumed atomically before the password change; reset mail goes to `Account.Email` only (username-only/PIN-only accounts skipped). **Users:** usernames may not contain `@`, emails must. **Tests:** `testutil` refuses a `TEST_DB_NAME` equal to `DB_NAME` or without "test". **Profiles:** `Apply` and profile save run in transactions, DB errors no longer reported as 404, `SetDefaults` no longer uses `INSERT IGNORE`. **DB:** migration 00008 composite FK `pos_terminals(tenant_id, branch_id) → branches(tenant_id, id)` (validated up/down on `mauzo_test`, applied to dev). Build + vet clean; tests not run (new `lockout_test.go` included). |

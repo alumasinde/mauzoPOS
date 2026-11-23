@@ -9,8 +9,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -25,7 +27,21 @@ var (
 	shared  *sqlx.DB
 	lock    *sql.Conn //nolint:unused // held so the MySQL named lock lives until process exit
 	initErr error
+	// guardErr is a fatal misconfiguration (tests pointed at a non-test DB).
+	guardErr error
 )
+
+// checkTestDBName refuses to run destructive integration tests against the
+// development database: tests DELETE whole tables via Truncate.
+func checkTestDBName(devName, testName string) error {
+	if testName == "" || strings.EqualFold(testName, devName) {
+		return fmt.Errorf("testutil: TEST_DB_NAME (%q) must be set and differ from DB_NAME (%q)", testName, devName)
+	}
+	if !strings.Contains(strings.ToLower(testName), "test") {
+		return fmt.Errorf("testutil: TEST_DB_NAME %q must contain \"test\" — refusing to truncate tables in it", testName)
+	}
+	return nil
+}
 
 // suiteLock serializes whole-table truncation across test packages: `go test`
 // runs package binaries in parallel and they share one test database, so a
@@ -43,6 +59,9 @@ func DB(t testing.TB) *sqlx.DB {
 			initErr = err
 			return
 		}
+		if guardErr = checkTestDBName(cfg.DB.Name, cfg.DB.TestName); guardErr != nil {
+			return
+		}
 		ctx := context.Background()
 		shared, initErr = db.Open(ctx, cfg.DB, cfg.DB.TestName)
 		if initErr != nil {
@@ -53,6 +72,9 @@ func DB(t testing.TB) *sqlx.DB {
 		}
 		initErr = db.MigrateUp(ctx, shared.DB)
 	})
+	if guardErr != nil {
+		t.Fatal(guardErr) // misconfiguration: never skip silently
+	}
 	if initErr != nil {
 		if os.Getenv("REQUIRE_TEST_DB") == "1" {
 			t.Fatalf("test database unavailable: %v", initErr)

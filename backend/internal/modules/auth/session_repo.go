@@ -50,11 +50,18 @@ func (r *SessionRepo) ByTokenHash(ctx context.Context, hash string) (Session, er
 	return s, err
 }
 
-// MarkMFAVerified flips a pending session to fully verified and extends its life.
-func (r *SessionRepo) MarkMFAVerified(ctx context.Context, id uint64, expiresAt time.Time) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE auth_sessions SET mfa_verified = 1, expires_at = ? WHERE id = ?`, expiresAt, id)
-	return err
+// MarkMFAVerified flips a pending, unrevoked session to fully verified and
+// extends its life. It reports false when the session was already verified or
+// revoked concurrently, so a ticket can only be redeemed once.
+func (r *SessionRepo) MarkMFAVerified(ctx context.Context, id uint64, expiresAt time.Time) (bool, error) {
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE auth_sessions SET mfa_verified = 1, expires_at = ?
+		 WHERE id = ? AND mfa_verified = 0 AND revoked_at IS NULL`, expiresAt, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
 }
 
 // Touch stamps last_used_at (throttled by the caller).

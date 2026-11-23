@@ -143,3 +143,29 @@ func (s *Service) Reactivate(ctx context.Context, publicID string) (Tenant, erro
 	}
 	return s.repo.SetStatus(ctx, t.ID, StatusActive, nil)
 }
+
+// ByID loads a tenant by internal id (onboarding/status lookups).
+func (s *Service) ByID(ctx context.Context, id uint64) (Tenant, error) {
+	return s.repo.ByID(ctx, id)
+}
+
+// SetBusinessType stores the business-type code chosen at onboarding.
+// Implements businesstypes.TenantWriter.
+func (s *Service) SetBusinessType(ctx context.Context, tenantID uint64, code string) error {
+	return s.repo.SetBusinessType(ctx, tenantID, code)
+}
+
+// SetBusinessFields stores the step-1 business details.
+func (s *Service) SetBusinessFields(ctx context.Context, tenantID uint64, name string, kraPin, address *string, vat bool) error {
+	return s.repo.SetBusinessFields(ctx, tenantID, name, kraPin, address, vat)
+}
+
+// AdvanceOnboarding moves onboarding_step forward (never backwards).
+func (s *Service) AdvanceOnboarding(ctx context.Context, tenantID uint64, step int) error {
+	return s.repo.SetOnboardingStep(ctx, tenantID, step)
+}
+
+// CompleteOnboarding stamps onboarded_at.
+func (s *Service) CompleteOnboarding(ctx context.Context, tenantID uint64) error {
+	return s.repo.CompleteOnboarding(ctx, tenantID)
+}

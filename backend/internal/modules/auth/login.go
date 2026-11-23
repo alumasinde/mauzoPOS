@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ func (s *Service) LoginPlatform(ctx context.Context, email, password string, met
 	}
 	acct, err := s.platform.ByEmail(ctx, email)
 	if db.IsNotFound(err) {
+		s.burnPasswordCheck(password)
 		s.limiter.fail(key)
 		s.record(ctx, identity.ActorPlatformUser, nil, nil, email, "unknown_identity", meta)
 		return nil, ErrInvalidCredentials
@@ -46,6 +48,7 @@ func (s *Service) LoginTenant(ctx context.Context, slug, identityName, password 
 	}
 	t, err := s.tenants.BySlug(ctx, slug)
 	if db.IsNotFound(err) {
+		s.burnPasswordCheck(password)
 		s.limiter.fail(key)
 		s.record(ctx, identity.ActorUser, nil, nil, identityName, "unknown_identity", meta)
 		return nil, ErrInvalidCredentials
@@ -55,6 +58,7 @@ func (s *Service) LoginTenant(ctx context.Context, slug, identityName, password 
 	}
 	acct, err := s.tenant.ByIdentity(ctx, t.ID, identityName)
 	if db.IsNotFound(err) {
+		s.burnPasswordCheck(password)
 		s.limiter.fail(key)
 		s.record(ctx, identity.ActorUser, nil, &t.ID, identityName, "unknown_identity", meta)
 		return nil, ErrInvalidCredentials
@@ -72,20 +76,23 @@ func (s *Service) finishLogin(ctx context.Context, key string, acct Account, t *
 	if acct.TenantID != 0 {
 		actorType = identity.ActorUser
 	}
-	if acct.Status != "active" {
-		s.limiter.fail(key)
-		s.record(ctx, actorType, &acct.ID, nilIfZero(acct.TenantID), identityName, "disabled", meta)
-		return nil, ErrAccountDisabled
-	}
-	if t != nil && t.Status == tenants.StatusSuspended {
-		s.limiter.fail(key)
-		s.record(ctx, actorType, &acct.ID, &t.ID, identityName, "suspended", meta)
-		return nil, tenants.ErrTenantSuspended
+	// Password first: account/tenant state is only revealed to someone who
+	// already holds the correct password.
+	if acct.PasswordHash == nil {
+		s.burnPasswordCheck(password) // PIN-only accounts: same cost as a wrong password
 	}
 	if acct.PasswordHash == nil || security.VerifyPassword(password, *acct.PasswordHash) != nil {
 		s.limiter.fail(key)
 		s.record(ctx, actorType, &acct.ID, nilIfZero(acct.TenantID), identityName, "bad_password", meta)
 		return nil, ErrInvalidCredentials
+	}
+	if acct.Status != "active" {
+		s.record(ctx, actorType, &acct.ID, nilIfZero(acct.TenantID), identityName, "disabled", meta)
+		return nil, ErrAccountDisabled
+	}
+	if t != nil && t.Status == tenants.StatusSuspended {
+		s.record(ctx, actorType, &acct.ID, &t.ID, identityName, "suspended", meta)
+		return nil, tenants.ErrTenantSuspended
 	}
 	s.limiter.succeed(key)
 
@@ -129,11 +136,21 @@ func (s *Service) finishLogin(ctx context.Context, key string, acct Account, t *
 // a full session.
 func (s *Service) VerifyMFA(ctx context.Context, ticket, code string, meta RequestMeta) (*LoginResult, error) {
 	sess, err := s.sessions.ByTokenHash(ctx, security.HashToken(ticket))
-	if db.IsNotFound(err) || sess.RevokedAt != nil || sess.MFAVerified || time.Now().After(sess.ExpiresAt) {
+	if db.IsNotFound(err) {
 		return nil, ErrMFATicketInvalid
 	}
 	if err != nil {
 		return nil, err
+	}
+	if sess.RevokedAt != nil || sess.MFAVerified || time.Now().After(sess.ExpiresAt) {
+		return nil, ErrMFATicketInvalid
+	}
+	// Each ticket allows LoginMaxAttempts code guesses, then it is revoked and
+	// the user must sign in again (which is itself rate limited).
+	key := mfaLockoutKey(sess.ID)
+	if time.Now().Before(s.limiter.lockedUntil(key)) {
+		_ = s.sessions.Revoke(ctx, sess.ID)
+		return nil, ErrMFATicketInvalid
 	}
 	acct, t, err := s.loadAccount(ctx, sess)
 	if err != nil {
@@ -145,10 +162,19 @@ func (s *Service) VerifyMFA(ctx context.Context, ticket, code string, meta Reque
 			tid = &t.ID
 		}
 		s.record(ctx, identity.ActorType(sess.ActorType), &acct.ID, tid, acct.Identity, "mfa_failed", meta)
+		if s.limiter.fail(key) {
+			_ = s.sessions.Revoke(ctx, sess.ID)
+			return nil, ErrTooManyAttempts
+		}
 		return nil, ErrMFACodeInvalid
 	}
-	if err := s.sessions.MarkMFAVerified(ctx, sess.ID, time.Now().Add(s.cfg.SessionTTL)); err != nil {
+	s.limiter.succeed(key)
+	ok, err := s.sessions.MarkMFAVerified(ctx, sess.ID, time.Now().Add(s.cfg.SessionTTL))
+	if err != nil {
 		return nil, err
+	}
+	if !ok {
+		return nil, ErrMFATicketInvalid // redeemed or revoked concurrently
 	}
 	actorType := identity.ActorType(sess.ActorType)
 	s.recordSuccess(ctx, actorType, acct, meta)
@@ -257,6 +283,10 @@ func (s *Service) touchLastLogin(ctx context.Context, actorType identity.ActorTy
 
 func lockoutKey(t identity.ActorType, scope, identityName string) string {
 	return string(t) + "|" + scope + "|" + strings.ToLower(identityName)
+}
+
+func mfaLockoutKey(sessionID uint64) string {
+	return "mfa|" + strconv.FormatUint(sessionID, 10)
 }
 
 func nilIfZero(v uint64) *uint64 {

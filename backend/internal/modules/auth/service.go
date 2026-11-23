@@ -18,6 +18,7 @@ type Account struct {
 	PublicID      string
 	Name          string
 	Identity      string // email for platform users, email/username for tenant users
+	Email         string // empty when the account has no email (username-only)
 	PasswordHash  *string
 	Role          string
 	Status        string
@@ -96,6 +97,7 @@ type Service struct {
 	platformURL string
 	webURL      string
 	limiter     *lockout
+	timing      timingEqualiser
 }
 
 // ServiceDeps bundles the stores and helpers a Service needs.

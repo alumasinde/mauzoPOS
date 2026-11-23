@@ -30,10 +30,12 @@ func (s *Service) ForgotPassword(ctx context.Context, actorType identity.ActorTy
 		if err != nil {
 			return nil
 		}
-		if acct.Identity == "" {
-			return nil // passwordless (PIN-only) accounts cannot self-reset
+		if acct.Email == "" || acct.PasswordHash == nil {
+			// Username-only accounts have nowhere to send a link, and PIN-only
+			// cashiers have no password; an administrator resets those.
+			return nil
 		}
-		email = acct.Identity
+		email = acct.Email
 		appURL = s.webURL
 	} else {
 		acct2, err := s.platform.ByEmail(ctx, strings.ToLower(identityName))
@@ -41,7 +43,7 @@ func (s *Service) ForgotPassword(ctx context.Context, actorType identity.ActorTy
 			return nil
 		}
 		acct = acct2
-		email = identityName
+		email = acct.Email
 		appURL = s.platformURL
 	}
 
@@ -74,15 +76,27 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 		return httpxWeakPassword()
 	}
 	pr, err := s.resets.ByTokenHash(ctx, security.HashToken(token))
-	if db.IsNotFound(err) || pr.UsedAt != nil || time.Now().After(pr.ExpiresAt) {
+	if db.IsNotFound(err) {
 		return ErrResetTokenInvalid
 	}
 	if err != nil {
 		return err
 	}
+	if pr.UsedAt != nil || time.Now().After(pr.ExpiresAt) {
+		return ErrResetTokenInvalid
+	}
 	hash, err := s.params.HashPassword(newPassword)
 	if err != nil {
 		return err
+	}
+	// Consume the token atomically before changing anything, so two
+	// concurrent requests with the same token cannot both set a password.
+	consumed, err := s.resets.Consume(ctx, pr.ID, time.Now())
+	if err != nil {
+		return err
+	}
+	if !consumed {
+		return ErrResetTokenInvalid
 	}
 	if identity.ActorType(pr.ActorType) == identity.ActorUser {
 		if err := s.tenant.UpdatePassword(ctx, pr.ActorID, hash); err != nil {
@@ -92,9 +106,6 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 		if err := s.platform.UpdatePassword(ctx, pr.ActorID, hash); err != nil {
 			return err
 		}
-	}
-	if err := s.resets.MarkUsed(ctx, pr.ID); err != nil {
-		return err
 	}
 	return s.sessions.RevokeAllForActor(ctx, pr.ActorType, pr.ActorID, 0)
 }

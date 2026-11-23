@@ -15,8 +15,14 @@ import (
 	mw "mauzo/internal/core/middleware"
 	auditmod "mauzo/internal/modules/audit"
 	"mauzo/internal/modules/auth"
+	"mauzo/internal/modules/branches"
+	"mauzo/internal/modules/businesstypes"
+	"mauzo/internal/modules/onboarding"
+	"mauzo/internal/modules/settings"
+	"mauzo/internal/modules/subscriptions"
 	"mauzo/internal/modules/system"
 	"mauzo/internal/modules/tenants"
+	"mauzo/internal/modules/terminals"
 	"mauzo/internal/modules/users"
 )
 
@@ -56,6 +62,8 @@ func platformRoutes(r chi.Router, c *app.Container) {
 		tenants.Routes(r, c.Tenants)
 		users.PlatformRoutes(r, c.PlatformUsers)
 		auditmod.PlatformRoutes(r, c.AuditLogs)
+		businesstypes.PlatformRoutes(r, c.BusinessTypes)
+		subscriptions.PlatformRoutes(r, c.Plans)
 	})
 }
 
@@ -67,6 +75,10 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 		r.Use(mw.RequireActor(identity.ActorUser))
 		auth.PrivateRoutes(r, c.Auth)
 		auditmod.TenantRoutes(r, c.AuditLogs)
+		settings.TenantRoutes(r, c.Settings)
+		branches.TenantRoutes(r, c.Branches)
+		terminals.TenantRoutes(r, c.Terminals)
+		onboarding.TenantRoutes(r, c.Onboarding)
 	})
 }
 

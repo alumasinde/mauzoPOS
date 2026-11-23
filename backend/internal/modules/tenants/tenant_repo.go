@@ -23,7 +23,8 @@ func NewRepo(conn *sqlx.DB) *Repo {
 }
 
 const tenantCols = `id, public_id, name, slug, email, phone, status,
-	suspended_at, suspend_reason, created_at, updated_at`
+	business_type, kra_pin, vat_registered, address, onboarding_step,
+	onboarded_at, suspended_at, suspend_reason, created_at, updated_at`
 
 // Create inserts a tenant.
 func (r *Repo) Create(ctx context.Context, t *Tenant) error {
@@ -128,6 +129,36 @@ func (r *Repo) SetStatus(ctx context.Context, id uint64, status string, reason *
 		return Tenant{}, err
 	}
 	return r.ByID(ctx, id)
+}
+
+// SetBusinessType writes the business_type code (idempotent profile apply).
+func (r *Repo) SetBusinessType(ctx context.Context, tenantID uint64, code string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE tenants SET business_type = ? WHERE id = ?`, code, tenantID)
+	return err
+}
+
+// SetBusinessFields stores the step-1 business details.
+func (r *Repo) SetBusinessFields(ctx context.Context, tenantID uint64, name string, kraPin, address *string, vat bool) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE tenants SET name = ?, kra_pin = ?, address = ?, vat_registered = ? WHERE id = ?`,
+		name, kraPin, address, vat, tenantID)
+	return err
+}
+
+// SetOnboardingStep advances onboarding_step (never backwards).
+func (r *Repo) SetOnboardingStep(ctx context.Context, tenantID uint64, step int) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE tenants SET onboarding_step = GREATEST(onboarding_step, ?) WHERE id = ?`,
+		step, tenantID)
+	return err
+}
+
+// CompleteOnboarding stamps onboarded_at.
+func (r *Repo) CompleteOnboarding(ctx context.Context, tenantID uint64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE tenants SET onboarded_at = COALESCE(onboarded_at, NOW(3)) WHERE id = ?`, tenantID)
+	return err
 }
 
 // ByID loads a tenant by internal id (used after writes; also by auth).

@@ -57,9 +57,16 @@ func (r *ResetRepo) ByTokenHash(ctx context.Context, hash string) (PasswordReset
 	return pr, err
 }
 
-// MarkUsed consumes a reset token.
-func (r *ResetRepo) MarkUsed(ctx context.Context, id uint64) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE auth_password_resets SET used_at = NOW(3) WHERE id = ?`, id)
-	return err
+// Consume atomically marks an unused, unexpired reset token as used. It
+// reports false when another request already consumed it (or it expired), so
+// each token sets a password at most once.
+func (r *ResetRepo) Consume(ctx context.Context, id uint64, now time.Time) (bool, error) {
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE auth_password_resets SET used_at = ?
+		 WHERE id = ? AND used_at IS NULL AND expires_at > ?`, now, id, now)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
 }

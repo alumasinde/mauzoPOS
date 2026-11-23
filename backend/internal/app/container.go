@@ -14,10 +14,17 @@ import (
 	"mauzo/internal/core/logger"
 	"mauzo/internal/core/mail"
 	"mauzo/internal/core/middleware"
+	coresettings "mauzo/internal/core/settings"
 	auditmod "mauzo/internal/modules/audit"
 	"mauzo/internal/modules/auth"
+	"mauzo/internal/modules/branches"
+	"mauzo/internal/modules/businesstypes"
+	"mauzo/internal/modules/onboarding"
+	"mauzo/internal/modules/settings"
+	"mauzo/internal/modules/subscriptions"
 	"mauzo/internal/modules/system"
 	"mauzo/internal/modules/tenants"
+	"mauzo/internal/modules/terminals"
 	"mauzo/internal/modules/users"
 )
 
@@ -41,6 +48,12 @@ type Container struct {
 	Tenants       *tenants.Handler
 	PlatformUsers *users.PlatformUserHandler
 	AuditLogs     *auditmod.Handler
+	BusinessTypes *businesstypes.Handler
+	Plans         *subscriptions.Handler
+	Settings      *settings.Handler
+	Branches      *branches.Handler
+	Terminals     *terminals.Handler
+	Onboarding    *onboarding.Handler
 }
 
 // NewContainer builds the logger, database pool and module handlers from cfg.
@@ -72,6 +85,27 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Audit:    auditW,
 	})
 
+	// Phase 2 services.
+	tenantSvc := tenants.NewService(tenantRepo, authSvc)
+	settingsStore := coresettings.NewStore(conn)
+	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc)
+	planSvc := subscriptions.NewService(subscriptions.NewRepo(conn), cfg.Onboarding.TrialDays)
+	branchSvc := branches.NewService(branches.NewRepo(conn))
+	terminalSvc := terminals.NewService(terminals.NewRepo(conn), branchSvc)
+	userSvc := users.NewUserService(userRepo, params)
+	onbSvc := onboarding.NewService(onboarding.Deps{
+		Tenants: tenantSvc,
+		Types:   btSvc,
+		Profile: btSvc,
+		Plans:   planSvc,
+		Subs:    planSvc,
+		Mods:    btSvc,
+		Branch:  branchSvc,
+		Admins:  userSvc,
+		Prefs:   settingsStore,
+		Term:    terminalSvc,
+	})
+
 	return &Container{
 		Config:      cfg,
 		Log:         log,
@@ -81,10 +115,16 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		AuthSvc:     authSvc,
 		System:      system.NewHandler(Version, map[string]system.Pinger{"database": conn}),
 		Auth:        auth.NewHandler(authSvc, auditW),
-		Tenants:     tenants.NewHandler(tenants.NewService(tenantRepo, authSvc), auditW),
+		Tenants:     tenants.NewHandler(tenantSvc, auditW),
 		PlatformUsers: users.NewPlatformUserHandler(
 			users.NewPlatformUserService(platformUserRepo, params), auditW),
-		AuditLogs: auditmod.NewHandler(auditmod.NewRepo(conn)),
+		AuditLogs:     auditmod.NewHandler(auditmod.NewRepo(conn)),
+		BusinessTypes: businesstypes.NewHandler(btSvc),
+		Plans:         subscriptions.NewHandler(planSvc),
+		Settings:      settings.NewHandler(settingsStore),
+		Branches:      branches.NewHandler(branchSvc),
+		Terminals:     terminals.NewHandler(terminalSvc),
+		Onboarding:    onboarding.NewHandler(onbSvc),
 	}, nil
 }
 

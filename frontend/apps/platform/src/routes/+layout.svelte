@@ -22,6 +22,8 @@
     { href: '/', label: 'Dashboard' },
     { href: '/tenants', label: 'Tenants' },
     { href: '/users', label: 'Platform users' },
+    { href: '/business-types', label: 'Business types' },
+    { href: '/plans', label: 'Plans' },
     { href: '/audit', label: 'Audit log' },
     { href: '/account', label: 'Account' },
   ] as const;

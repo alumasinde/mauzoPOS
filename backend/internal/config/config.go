@@ -26,6 +26,12 @@ type Config struct {
 	Log            LogConfig
 	Auth           AuthConfig
 	Mail           MailConfig
+	Onboarding     OnboardingConfig
+}
+
+// OnboardingConfig holds new-tenant onboarding settings.
+type OnboardingConfig struct {
+	TrialDays int
 }
 
 // HTTPConfig holds HTTP server settings.
@@ -148,6 +154,9 @@ func Load(envFiles ...string) (Config, error) {
 			User:     getStr("SMTP_USER", ""),
 			Password: getStr("SMTP_PASSWORD", ""),
 			From:     getStr("MAIL_FROM", "no-reply@localhost"),
+		},
+		Onboarding: OnboardingConfig{
+			TrialDays: e.int("ONBOARDING_TRIAL_DAYS", 14),
 		},
 	}
 	if e.err != nil {

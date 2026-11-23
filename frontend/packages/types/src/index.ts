@@ -125,3 +125,82 @@ export interface MFASetup {
 export interface MFAEnabled {
   recovery_codes: string[];
 }
+
+export interface BusinessType {
+  code: string;
+  name: string;
+}
+
+export interface ProfileDefinition {
+  modules: string[];
+  categories: string[];
+  settings: Record<string, unknown>;
+  receipt_template: string;
+  pos_layout: Record<string, unknown>;
+}
+
+export interface BusinessProfile {
+  id: string;
+  business_type: string;
+  name: string;
+  is_default: boolean;
+  definition: ProfileDefinition;
+  updated_at: string;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  description?: string;
+  price_kes: MoneyString;
+  billing_interval: 'monthly' | 'yearly';
+  modules: string[];
+  max_branches?: number;
+  max_users?: number;
+  is_active: boolean;
+  sort: number;
+}
+
+export interface SubscriptionInfo {
+  plan_id: string;
+  plan_name: string;
+  status: 'trialing' | 'active' | 'past_due' | 'cancelled';
+  starts_at: string;
+  trial_ends_at?: string;
+}
+
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string;
+  location?: string;
+  is_main: boolean;
+  status: 'active' | 'closed';
+}
+
+export interface PosTerminal {
+  id: string;
+  branch_id: number;
+  name: string;
+  status: 'pending' | 'active' | 'disabled';
+}
+
+export interface SettingEntry {
+  key: string;
+  value: unknown;
+  updated_at: string;
+}
+
+export interface OnboardingState {
+  step: number;
+  done: boolean;
+  business_type?: string;
+  business_types: BusinessType[];
+  profiles: BusinessProfile[];
+  plans: Plan[];
+  modules: string[];
+  branches: Branch[];
+  terminals: PosTerminal[];
+  subscription?: SubscriptionInfo;
+}

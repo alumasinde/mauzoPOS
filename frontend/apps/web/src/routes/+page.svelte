@@ -1,11 +1,31 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { resolve } from '$app/paths';
+  import type { OnboardingState } from '@mauzo/types';
   import { auth } from '#lib/auth.ts';
+  import { api } from '#lib/api.ts';
+
+  let pendingSetup = $state(false);
+
+  onMount(async () => {
+    if (auth.user?.role !== 'owner' && auth.user?.role !== 'admin') return;
+    try {
+      const st = await api.get<OnboardingState>('/api/v1/t/onboarding');
+      pendingSetup = !!st && !st.done;
+    } catch {
+      pendingSetup = false;
+    }
+  });
 </script>
 
 <section class="head">
   <h1>Dashboard</h1>
   <p class="muted">Welcome back, {auth.user?.name}.</p>
 </section>
+
+{#if pendingSetup}
+  <a class="banner" href={resolve('/onboarding')}>Finish business setup →</a>
+{/if}
 
 <div class="grid">
   <section class="card">
@@ -34,6 +54,17 @@
   }
   .muted {
     color: var(--color-text-muted);
+  }
+  .banner {
+    display: block;
+    margin-top: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    background: #eff6ff;
+    color: var(--color-primary, #2563eb);
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    font-weight: 600;
   }
   .grid {
     display: grid;

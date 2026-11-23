@@ -35,6 +35,8 @@
       <nav>
         <a href={resolve('/')} class:active={page.url.pathname === '/'}>Dashboard</a>
         {#if canAudit}
+          <a href={resolve('/onboarding')} class:active={page.url.pathname === '/onboarding'}>Setup</a>
+          <a href={resolve('/settings')} class:active={page.url.pathname === '/settings'}>Settings</a>
           <a href={resolve('/audit')} class:active={page.url.pathname === '/audit'}>Audit log</a>
         {/if}
         <a href={resolve('/account')} class:active={page.url.pathname === '/account'}>Account</a>

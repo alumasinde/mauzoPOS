@@ -32,9 +32,17 @@ func (s *UserService) CreateTenantUser(ctx context.Context, tenantID uint64,
 		Status:   StatusActive,
 	}
 	if v := strings.ToLower(strings.TrimSpace(email)); v != "" {
+		if !strings.Contains(v, "@") {
+			return User{}, ErrInvalidEmail
+		}
 		u.Email = &v
 	}
 	if v := strings.TrimSpace(username); v != "" {
+		// Sign-in matches "email = ? OR username = ?", so a username must never
+		// look like an email or it could shadow another user's email.
+		if strings.Contains(v, "@") {
+			return User{}, ErrInvalidUsername
+		}
 		u.Username = &v
 	}
 	if password != "" {

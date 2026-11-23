@@ -26,6 +26,7 @@ func platformAccount(u users.PlatformUser) Account {
 		PublicID:      u.PublicID,
 		Name:          u.Name,
 		Identity:      u.Email,
+		Email:         u.Email,
 		PasswordHash:  &u.PasswordHash,
 		Role:          u.Role,
 		Status:        u.Status,
@@ -78,9 +79,9 @@ func NewTenantAccountStore(repo *users.UserRepo) *TenantAccountStore {
 }
 
 func tenantAccount(u users.User) Account {
-	var ident string
+	var ident, email string
 	if u.Email != nil {
-		ident = *u.Email
+		ident, email = *u.Email, *u.Email
 	} else if u.Username != nil {
 		ident = *u.Username
 	}
@@ -90,6 +91,7 @@ func tenantAccount(u users.User) Account {
 		PublicID:      u.PublicID,
 		Name:          u.Name,
 		Identity:      ident,
+		Email:         email,
 		PasswordHash:  u.PasswordHash,
 		Role:          u.Role,
 		Status:        u.Status,

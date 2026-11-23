@@ -15,4 +15,6 @@ var (
 	ErrLastSuperAdmin  = httpx.NewError(http.StatusConflict, "last_super_admin", "Cannot remove the last active super admin.")
 	ErrAlreadyDisabled = httpx.NewError(http.StatusConflict, "already_disabled", "The user is already disabled.")
 	ErrAlreadyEnabled  = httpx.NewError(http.StatusConflict, "already_enabled", "The user is already active.")
+	ErrInvalidEmail    = httpx.NewError(http.StatusUnprocessableEntity, "invalid_email", "Enter a valid email address.")
+	ErrInvalidUsername = httpx.NewError(http.StatusUnprocessableEntity, "invalid_username", "Usernames cannot contain @.")
 )
