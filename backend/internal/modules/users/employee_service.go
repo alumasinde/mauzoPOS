@@ -172,16 +172,17 @@ func (s *UserService) SetEmployeeStatus(ctx context.Context, actor identity.Acto
 	if u.ID == actor.ID {
 		return User{}, ErrSelfChange
 	}
-	switch {
-	case status == u.Status && status == StatusDisabled:
-		return User{}, ErrAlreadyDisabled
-	case status == u.Status:
+	switch status {
+	case u.Status:
+		if status == StatusDisabled {
+			return User{}, ErrAlreadyDisabled
+		}
 		return User{}, ErrAlreadyEnabled
-	case status == StatusDisabled:
+	case StatusDisabled:
 		if err := s.guardLastOwner(ctx, u.TenantID, u.RoleID, u.Status); err != nil {
 			return User{}, err
 		}
-	case status == StatusActive:
+	case StatusActive:
 		if err := s.checkSeat(ctx, u.TenantID); err != nil {
 			return User{}, err
 		}

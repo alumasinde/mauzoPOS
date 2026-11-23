@@ -54,17 +54,14 @@ func EnsureSystemRolesAll(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	defer func() { _ = rows.Close() }()
 	var ids []uint64
 	for rows.Next() {
 		var id uint64
 		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
 			return err
 		}
 		ids = append(ids, id)
-	}
-	if err := rows.Close(); err != nil {
-		return err
 	}
 	if err := rows.Err(); err != nil {
 		return err

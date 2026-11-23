@@ -27,6 +27,8 @@ type Config struct {
 	Auth           AuthConfig
 	Mail           MailConfig
 	Onboarding     OnboardingConfig
+	// UploadDir is the local root for stored uploads (product images).
+	UploadDir string
 }
 
 // OnboardingConfig holds new-tenant onboarding settings.
@@ -158,6 +160,7 @@ func Load(envFiles ...string) (Config, error) {
 		Onboarding: OnboardingConfig{
 			TrialDays: e.int("ONBOARDING_TRIAL_DAYS", 14),
 		},
+		UploadDir: getStr("UPLOAD_DIR", "uploads"),
 	}
 	if e.err != nil {
 		return Config{}, e.err

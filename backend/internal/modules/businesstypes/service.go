@@ -161,7 +161,7 @@ func (s *Service) Apply(ctx context.Context, tenantID uint64, profilePublicID st
 	if err != nil {
 		return Profile{}, err
 	}
-	err = s.repo.InTx(ctx, func(tx *sqlx.Tx, r *Repo) error {
+	err = s.repo.InTx(ctx, func(tx *sqlx.Tx, _ *Repo) error {
 		if err := s.modules.EnableAll(ctx, tx, tenantID, p.Definition.Modules); err != nil {
 			return err
 		}

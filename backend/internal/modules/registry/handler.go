@@ -110,7 +110,7 @@ func (h *Handler) SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	h.audit.Log(r.Context(), audit.FromRequest(r, audit.Entry{
 		Action: "settings.module.configure", EntityType: "module", EntityID: code,
-		Data: map[string]any{"config": json.RawMessage(req.Config)},
+		Data: map[string]any{"config": req.Config},
 	}))
 	h.writeTenantView(w, r, a.TenantID, nil)
 }

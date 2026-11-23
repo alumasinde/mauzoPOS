@@ -11,6 +11,7 @@ import (
 	_ "mauzo/internal/modules/auth"          // auth context
 	_ "mauzo/internal/modules/branches"      // permissions
 	_ "mauzo/internal/modules/businesstypes" // permissions
+	_ "mauzo/internal/modules/catalog"       // permissions
 	_ "mauzo/internal/modules/dashboard"     // permissions
 	_ "mauzo/internal/modules/onboarding"    // routes
 	_ "mauzo/internal/modules/pos"           // permissions

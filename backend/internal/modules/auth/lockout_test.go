@@ -8,7 +8,10 @@ import (
 
 func TestLockoutLocksAtThreshold(t *testing.T) {
 	l := newLockout(3, time.Minute)
-	if l.fail("k") || l.fail("k") {
+	if l.fail("k") {
+		t.Fatal("locked too early")
+	}
+	if l.fail("k") {
 		t.Fatal("locked too early")
 	}
 	if !l.fail("k") {

@@ -134,9 +134,9 @@ type templateRole struct {
 	IsLocked   bool   `db:"is_locked"`
 }
 
-// TemplateRoles returns system roles that still follow their template,
+// templateRoles returns system roles that still follow their template,
 // optionally for one tenant (0 = all tenants).
-func (r *Repo) TemplateRoles(ctx context.Context, tenantID uint64) ([]templateRole, error) {
+func (r *Repo) templateRoles(ctx context.Context, tenantID uint64) ([]templateRole, error) {
 	var out []templateRole
 	q := `SELECT id, tenant_id, code, customized, is_locked FROM roles
 	      WHERE is_system = 1 AND customized = 0 AND is_locked = 0`

@@ -38,9 +38,10 @@ func setup(t *testing.T) (*onboarding.Service, *sqlx.DB, uint64) {
 		"user_branches", "users", "roles", "tenants")
 	ctx := context.Background()
 
-	// Reference data normally seeded by seeds/catalogue.go.
+	// Reference data normally seeded by seeds/catalogue.go (INSERT IGNORE — the
+	// row may persist from a prior suite run on the shared test database).
 	if _, err := conn.ExecContext(ctx,
-		`INSERT INTO business_types (code, name, sort) VALUES ('butchery','Butchery',1)`); err != nil {
+		`INSERT IGNORE INTO business_types (code, name, sort) VALUES ('butchery','Butchery',1)`); err != nil {
 		t.Fatal(err)
 	}
 	var typeID uint64
@@ -52,13 +53,13 @@ func setup(t *testing.T) (*onboarding.Service, *sqlx.DB, uint64) {
 		"settings":{"tax.prices_include_vat":false,"receipt.paper_width":80},
 		"receipt_template":"","pos_layout":{"weighted_items":true}}`
 	if _, err := conn.ExecContext(ctx,
-		`INSERT INTO business_profiles (public_id, business_type_id, name, is_default, definition)
+		`INSERT IGNORE INTO business_profiles (public_id, business_type_id, name, is_default, definition)
 		 VALUES (?, ?, 'Standard', 1, ?)`, security.NewPublicID(), typeID, def); err != nil {
 		t.Fatal(err)
 	}
 	mods, _ := json.Marshal([]string{"dashboard", "settings", "catalog", "sales", "payments", "weighing_scales", "reports"})
 	if _, err := conn.ExecContext(ctx,
-		`INSERT INTO plans (public_id, name, price_kes, billing_interval, modules, is_active, sort)
+		`INSERT IGNORE INTO plans (public_id, name, price_kes, billing_interval, modules, is_active, sort)
 		 VALUES (?, 'Starter', 1500, 'monthly', ?, 1, 1)`, security.NewPublicID(), mods); err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +338,7 @@ func TestSettingsValidation(t *testing.T) {
 }
 
 // ownerActor builds a signed-in owner for steps that check the actor.
-func ownerActor(t *testing.T, conn *sqlx.DB, tenantID uint64) identity.Actor {
+func ownerActor(t *testing.T, _ *sqlx.DB, tenantID uint64) identity.Actor {
 	t.Helper()
 	return identity.Actor{
 		Type: identity.ActorUser, TenantID: tenantID, Role: "owner",

@@ -136,7 +136,7 @@ func (s *Service) Disable(ctx context.Context, tenantID uint64, code string, cas
 	if len(dependents) > 0 && !cascade {
 		return nil, ErrHasDependents.WithDetails(map[string]any{"dependents": dependents})
 	}
-	off := append(dependents, code)
+	off := append(slices.Clone(dependents), code)
 	err = s.repo.InTx(ctx, func(r *Repo) error {
 		for _, c := range off {
 			if err := r.SetEnabled(ctx, tenantID, c, false, sources[c]); err != nil {

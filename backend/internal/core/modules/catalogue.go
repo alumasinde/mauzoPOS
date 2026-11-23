@@ -38,7 +38,12 @@ var operationsModules = []Module{
 	{Code: "terminals", Name: "POS terminals", Group: GroupOperations, Depends: []string{"branches"},
 		Description: "Windows POS terminals, registration and licensing."},
 	{Code: "catalog", Name: "Products & catalog", Group: GroupOperations,
-		Description: "Products, categories, brands, units and barcodes."},
+		Description: "Products, categories, brands, units and barcodes.",
+		Nav: []NavItem{
+			{Key: "catalog", Label: "Products", Path: "/catalog", Icon: "box", Permission: "catalog.product.view", Order: 30},
+			{Key: "catalog-taxonomy", Label: "Categories", Path: "/catalog/taxonomy", Icon: "tags", Permission: "catalog.product.view", Order: 31},
+		},
+	},
 	{Code: "pricing", Name: "Pricing & price lists", Group: GroupOperations, Depends: []string{"catalog"},
 		Description: "Price lists, bulk and tiered pricing."},
 	{Code: "promotions", Name: "Promotions", Group: GroupGrowth, Depends: []string{"pricing"},

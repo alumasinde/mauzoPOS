@@ -51,7 +51,7 @@ func (s *Service) ProvisionTenant(ctx context.Context, tenantID uint64) error {
 func (s *Service) SyncTemplates(ctx context.Context) error { return s.syncTemplates(ctx, 0) }
 
 func (s *Service) syncTemplates(ctx context.Context, tenantID uint64) error {
-	rows, err := s.repo.TemplateRoles(ctx, tenantID)
+	rows, err := s.repo.templateRoles(ctx, tenantID)
 	if err != nil {
 		return err
 	}

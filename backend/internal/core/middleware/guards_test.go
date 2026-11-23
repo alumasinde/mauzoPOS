@@ -86,7 +86,7 @@ func (f fakeBranches) BranchByPublicID(_ context.Context, _ uint64, pid string) 
 
 func TestBranchScope(t *testing.T) {
 	var got uint64
-	h := BranchScope(fakeBranches{"A": 1, "B": 2})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := BranchScope(fakeBranches{"A": 1, "B": 2})(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		got, _ = tenancy.BranchID(r.Context())
 	}))
 	a := tenantUser(authz.NewSet())

@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"mauzo/internal/core/authz"
+	"mauzo/internal/core/db"
 	"mauzo/internal/core/identity"
 	"mauzo/internal/core/security"
 )
@@ -29,10 +30,10 @@ func (s Services) Tenant(t testing.TB, conn *sqlx.DB, slug string) uint64 {
 		t.Fatal(err)
 	}
 	id, _ := res.LastInsertId()
-	if err := s.Roles.ProvisionTenant(ctx, uint64(id)); err != nil {
+	if err := s.Roles.ProvisionTenant(ctx, db.U64(id)); err != nil {
 		t.Fatal(err)
 	}
-	return uint64(id)
+	return db.U64(id)
 }
 
 // Branch inserts a branch and returns its id and public id.
@@ -46,7 +47,7 @@ func Branch(t testing.TB, conn *sqlx.DB, tenantID uint64, code string) (uint64, 
 		t.Fatal(err)
 	}
 	id, _ := res.LastInsertId()
-	return uint64(id), pid
+	return db.U64(id), pid
 }
 
 // Actor builds a signed-in tenant user holding the role with template code

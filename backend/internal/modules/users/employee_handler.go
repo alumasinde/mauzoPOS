@@ -113,6 +113,7 @@ func (h *EmployeeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Password != nil || req.PIN != nil {
+		//nolint:gosec // these are field names in a validation message, not credentials
 		httpx.WriteError(w, r, httpx.ErrValidation.WithDetails(map[string]any{
 			"password": "use POST /employees/{id}/password", "pin": "use POST /employees/{id}/pin",
 		}))

@@ -27,8 +27,8 @@ type entry[V any] struct {
 
 // New builds a cache. max bounds memory; when full, expired entries are
 // swept and, if still full, the cache is reset.
-func New[K comparable, V any](ttl time.Duration, max int) *TTL[K, V] {
-	return &TTL[K, V]{ttl: ttl, max: max, entries: map[K]entry[V]{}, now: time.Now}
+func New[K comparable, V any](ttl time.Duration, limit int) *TTL[K, V] {
+	return &TTL[K, V]{ttl: ttl, max: limit, entries: map[K]entry[V]{}, now: time.Now}
 }
 
 // Get returns a live value.

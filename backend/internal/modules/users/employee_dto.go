@@ -18,10 +18,7 @@ type EmployeeRequest struct {
 }
 
 func (r EmployeeRequest) input() EmployeeInput {
-	return EmployeeInput{
-		Name: r.Name, Email: r.Email, Username: r.Username, Password: r.Password, PIN: r.PIN,
-		RoleID: r.RoleID, AllBranches: r.AllBranches, Branches: r.Branches,
-	}
+	return EmployeeInput(r)
 }
 
 // SecretRequest sets a password or PIN.

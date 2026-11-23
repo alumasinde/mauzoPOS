@@ -19,6 +19,7 @@ import (
 	"mauzo/internal/modules/auth"
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
+	"mauzo/internal/modules/catalog"
 	"mauzo/internal/modules/onboarding"
 	_ "mauzo/internal/modules/registerall" // complete permission registry
 	"mauzo/internal/modules/registry"
@@ -60,6 +61,8 @@ type Container struct {
 	Settings      *settings.Handler
 	Branches      *branches.Handler
 	Terminals     *terminals.Handler
+	Catalog       *catalog.Handler
+	CatalogTax    *catalog.TaxonomyHandler
 	Onboarding    *onboarding.Handler
 	Roles         *roles.Handler
 	Modules       *registry.Handler
@@ -103,26 +106,19 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Access:   accessSvc,
 	})
 
-	tenantSvc := tenants.NewService(tenantRepo, authSvc)
-	tenantSvc.AddProvisioner(roleSvc)
-	settingsStore := coresettings.NewStore(conn)
-	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc, registrySvc)
-	branchSvc := branches.NewService(branches.NewRepo(conn))
-	terminalSvc := terminals.NewService(terminals.NewRepo(conn), branchSvc)
+	tenantSvc, settingsStore, btSvc, branchSvc, terminalSvc := tenantTooling(conn, tenantRepo, authSvc, roleSvc, registrySvc)
+
+	// Catalog: taxonomy and products, with images on local disk.
+	catalogSvc, taxSvc, err := catalogStack(conn, cfg)
+	if err != nil {
+		return nil, err
+	}
 	userSvc := users.NewUserService(userRepo, params, users.Deps{
 		Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc,
 	})
 	onbSvc := onboarding.NewService(onboarding.Deps{
-		Tenants: tenantSvc,
-		Types:   btSvc,
-		Profile: btSvc,
-		Plans:   planSvc,
-		Subs:    planSvc,
-		Mods:    registrySvc,
-		Branch:  branchSvc,
-		Admins:  userSvc,
-		Prefs:   settingsStore,
-		Term:    terminalSvc,
+		Tenants: tenantSvc, Types: btSvc, Profile: btSvc, Plans: planSvc, Subs: planSvc,
+		Mods: registrySvc, Branch: branchSvc, Admins: userSvc, Prefs: settingsStore, Term: terminalSvc,
 	})
 
 	return &Container{
@@ -147,10 +143,39 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Settings:      settings.NewHandler(settingsStore),
 		Branches:      branches.NewHandler(branchSvc),
 		Terminals:     terminals.NewHandler(terminalSvc),
+		Catalog:       catalog.NewHandler(catalogSvc, taxSvc),
+		CatalogTax:    catalog.NewTaxonomyHandler(taxSvc),
 		Onboarding:    onboarding.NewHandler(onbSvc),
 		Roles:         roles.NewHandler(roleSvc, auditW),
 		Modules:       registry.NewHandler(registrySvc, tenantSvc, auditW),
 	}, nil
+}
+
+// tenantTooling builds the tenant-scoped services shared by onboarding and the
+// back-office modules (kept out of NewContainer for readability).
+func tenantTooling(
+	conn *sqlx.DB, tenantRepo *tenants.Repo, authSvc *auth.Service,
+	roleSvc *roles.Service, registrySvc *registry.Service,
+) (*tenants.Service, *coresettings.Store, *businesstypes.Service, *branches.Service, *terminals.Service) {
+	tenantSvc := tenants.NewService(tenantRepo, authSvc)
+	tenantSvc.AddProvisioner(roleSvc)
+	settingsStore := coresettings.NewStore(conn)
+	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc, registrySvc)
+	branchSvc := branches.NewService(branches.NewRepo(conn))
+	return tenantSvc, settingsStore, btSvc, branchSvc,
+		terminals.NewService(terminals.NewRepo(conn), branchSvc)
+}
+
+// catalogStack builds the catalog module's services (kept out of NewContainer
+// for readability).
+func catalogStack(conn *sqlx.DB, cfg config.Config) (*catalog.Service, *catalog.TaxonomyService, error) {
+	imageStore, err := catalog.NewDiskImageStore(cfg.UploadDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	taxRepo := catalog.NewTaxonomyRepo(conn)
+	return catalog.NewService(conn, catalog.NewProductRepo(conn), taxRepo, imageStore),
+		catalog.NewTaxonomyService(taxRepo), nil
 }
 
 // Close releases container resources (the database pool).
