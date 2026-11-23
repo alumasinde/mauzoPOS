@@ -23,6 +23,7 @@ export const ROUTES = [
   '/pricing',
   '/pricing/promotions',
   '/pricing/history',
+  '/receipts/designer',
   '/terminals',
   '/sales',
   '/sales/history',

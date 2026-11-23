@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"mauzo/internal/core/security"
+	"mauzo/pkg/receiptfmt"
 )
 
 // PayLine is the wire shape of one cart line for POST /pos/sales.
@@ -46,17 +47,21 @@ type PayResult struct {
 	Total     string `json:"total"`
 	ChangeDue string `json:"change_due"`
 	Offline   bool   `json:"offline"`
+	// Printing outcome (a printer problem never fails the sale).
+	Printed    bool   `json:"printed"`
+	CanPrint   bool   `json:"can_print"` // PrintLast has a receipt to print
+	PrintError string `json:"print_error,omitempty"`
 }
 
 // saleResponse is the server reply to POST /pos/sales.
 type saleResponse struct {
-	Sale struct {
-		ID        string `json:"id"`
-		Total     string `json:"total"`
-		ChangeDue string `json:"change_due"`
-	} `json:"sale"`
-	ReceiptNo    uint64 `json:"receipt_no"`
-	Deduplicated bool   `json:"deduplicated"`
+	Sale         saleDetailWire `json:"sale"`
+	ReceiptNo    uint64         `json:"receipt_no"`
+	Deduplicated bool           `json:"deduplicated"`
+	Receipt      *struct {
+		ID     string            `json:"id"`
+		Output receiptfmt.Output `json:"output"`
+	} `json:"receipt"`
 }
 
 // buildPayload converts the local cart into the server request. Public ids
@@ -118,8 +123,16 @@ func (a *App) Pay(paymentsJSON, cartJSON, orderDiscount, customerID, grant, note
 	var out saleResponse
 	err = a.request("POST", "/api/v1/pos/sales", json.RawMessage(payload), &out)
 	if err == nil {
-		return PayResult{SaleID: out.Sale.ID, ReceiptNo: out.ReceiptNo,
-			Total: out.Sale.Total, ChangeDue: out.Sale.ChangeDue}, nil
+		res := PayResult{SaleID: out.Sale.ID, ReceiptNo: out.ReceiptNo,
+			Total: out.Sale.Total, ChangeDue: out.Sale.ChangeDue}
+		var rc receiptfmt.Output
+		if out.Receipt != nil {
+			rc = out.Receipt.Output // the server's issued snapshot
+		} else {
+			rc = a.receiptFromDetail(out.Sale)
+		}
+		a.afterSale(&res, &rc, hasCash(payments))
+		return res, nil
 	}
 	if !errors.Is(err, ErrOffline) {
 		return PayResult{}, err // validation errors surface to the cashier
@@ -128,7 +141,16 @@ func (a *App) Pay(paymentsJSON, cartJSON, orderDiscount, customerID, grant, note
 	if err := a.db.RecordPendingSale(a.ctx, key, string(payload), "{}", "", a.cashierID()); err != nil {
 		return PayResult{}, err
 	}
-	return PayResult{SaleID: key, Offline: true}, nil
+	res := PayResult{SaleID: key, Offline: true}
+	var lines []CartLine
+	if json.Unmarshal([]byte(cartJSON), &lines) == nil {
+		if rc, perr := a.provisionalReceipt(key, lines, payments, orderDiscount); perr == nil {
+			a.afterSale(&res, &rc, hasCash(payments))
+		} else {
+			res.PrintError = perr.Error()
+		}
+	}
+	return res, nil
 }
 
 // SyncPending uploads queued offline sales. Server idempotency keys make a

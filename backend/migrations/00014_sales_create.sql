@@ -156,4 +156,10 @@ CREATE TABLE sale_return_items (
 );
 
 -- +goose Down
-DROP TABLE sale_re
+DROP TABLE sale_return_items;
+DROP TABLE sale_returns;
+DROP TABLE sale_payments;
+DROP TABLE sale_items;
+DROP TABLE sales;
+DROP TABLE tenant_counters;
+DROP TABLE customers;

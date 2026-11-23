@@ -29,6 +29,7 @@ type App struct {
 	session *Session
 	scale   barcode.ScaleConfig
 	fails   map[string]*pinFail
+	print   printState
 }
 
 // Session is the signed-in cashier.

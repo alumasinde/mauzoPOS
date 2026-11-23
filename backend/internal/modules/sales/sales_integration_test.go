@@ -16,6 +16,7 @@ import (
 	"mauzo/internal/modules/customers"
 	"mauzo/internal/modules/inventory"
 	"mauzo/internal/modules/pricing"
+	_ "mauzo/internal/modules/registerall" // every permission, for locked-role checks
 	"mauzo/internal/modules/sales"
 	"mauzo/internal/testutil"
 )
@@ -464,3 +465,34 @@ func TestPriceOverrideGate(t *testing.T) {
 }
 
 var _ = httpx.ErrValidation // keep the import if unused paths change
+
+// The owner's role is locked: it holds every permission implicitly and has no
+// role_permissions rows. Till-side checks must still see its permissions.
+func TestLockedOwnerHoldsEveryPermission(t *testing.T) {
+	f := setup(t)
+	if _, err := f.conn.ExecContext(f.ctx,
+		`INSERT INTO roles (tenant_id, public_id, code, name, is_system, is_locked) VALUES (?, ?, 'owner', 'Owner', 1, 1)`,
+		f.tenantID, security.NewPublicID()); err != nil {
+		t.Fatal(err)
+	}
+	pub := security.NewPublicID()
+	if _, err := f.conn.ExecContext(f.ctx,
+		`INSERT INTO users (tenant_id, public_id, name, username, role_id, all_branches, status)
+		 SELECT ?, ?, 'Owner', 'owner1', id, 1, 'active' FROM roles WHERE tenant_id = ? AND code = 'owner'`,
+		f.tenantID, pub, f.tenantID); err != nil {
+		t.Fatal(err)
+	}
+	var ownerID uint64
+	if err := f.conn.GetContext(f.ctx, &ownerID, `SELECT id FROM users WHERE public_id = ?`, pub); err != nil {
+		t.Fatal(err)
+	}
+	a, err := f.svc.Authz(f.ctx, f.tenantID, ownerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"pos.sale.create", "pos.receipt.reprint", "sales.refund.create"} {
+		if !a.Perms[p] {
+			t.Errorf("owner lacks %s", p)
+		}
+	}
+}

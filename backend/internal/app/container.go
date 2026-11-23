@@ -25,6 +25,7 @@ import (
 	"mauzo/internal/modules/onboarding"
 	"mauzo/internal/modules/pos"
 	"mauzo/internal/modules/pricing"
+	"mauzo/internal/modules/receipts"
 	_ "mauzo/internal/modules/registerall" // complete permission registry
 	"mauzo/internal/modules/registry"
 	"mauzo/internal/modules/roles"
@@ -78,6 +79,7 @@ type Container struct {
 	POSSvc        *pos.Service
 	Customers     *customers.Handler
 	Sales         *sales.Handler
+	Receipts      *receipts.Handler
 }
 
 // NewContainer builds the logger, database pool and module services.
@@ -120,6 +122,8 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	salesSvc := sales.NewService(conn, sales.NewRepo(conn), catalogSvc, pricingSvc, promoSvc, invSvc, customerSvc)
 	posSvc := pos.NewService(conn, pos.NewRepo(conn))
 	posSvc.BindSales(salesSvc)
+	receiptSvc := receipts.NewService(conn, receipts.NewRepo(conn))
+	posSvc.BindReceipts(receiptSvc)
 	userSvc := users.NewUserService(userRepo, params, users.Deps{
 		Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc,
 	})
@@ -161,6 +165,7 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		POSSvc:    posSvc,
 		Customers: customers.NewHandler(customerSvc),
 		Sales:     sales.NewHandler(salesSvc, branchSvc),
+		Receipts:  receipts.NewHandler(receiptSvc, salesSvc),
 	}, nil
 }
 

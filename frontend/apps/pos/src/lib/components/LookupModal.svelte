@@ -2,6 +2,7 @@
   // Transaction lookup — find a sale by receipt number or id (this branch only).
   import { desktop } from '../desktop';
   import { formatMoney } from '../money';
+  import ReprintButton from './ReprintButton.svelte';
 
   let { currency = 'KSh', onclose }: { currency?: string; onclose: () => void } = $props();
 
@@ -79,12 +80,16 @@
           {/each}
         </div>
       {/if}
+      <div class="rp"><ReprintButton receipt={sale.receipt_no} /></div>
     </div>
   {/if}
   <button class="ghost" onclick={onclose}>Close</button>
 </div>
 
 <style>
+  .rp {
+    margin-top: var(--space-3);
+  }
   .modal {
     width: min(440px, 92vw);
     background: var(--color-surface);

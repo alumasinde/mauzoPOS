@@ -47,6 +47,7 @@ func withMods(extra ...string) []string {
 
 var seedTypes = []seedType{
 	{code: "supermarket", name: "Supermarket", sort: 10, profile: profileDef{
+		Receipt:    "supermarket",
 		Modules:    withMods("weighing_scales", "loyalty", "etims"),
 		Categories: []string{"Groceries", "Fresh Produce", "Bakery", "Household", "Personal Care", "Beverages"},
 		Settings: map[string]any{
@@ -59,6 +60,7 @@ var seedTypes = []seedType{
 		PosLayout: map[string]any{"grid_columns": 5, "show_images": true, "numpad": true},
 	}},
 	{code: "minimart", name: "Mini Mart / Convenience", sort: 20, profile: profileDef{
+		Receipt:    "minimart",
 		Modules:    retailModules,
 		Categories: []string{"Snacks", "Drinks", "Airtime", "Toiletries", "Household"},
 		Settings: map[string]any{
@@ -70,6 +72,7 @@ var seedTypes = []seedType{
 		PosLayout: map[string]any{"grid_columns": 4, "show_images": false, "numpad": true},
 	}},
 	{code: "butchery", name: "Butchery", sort: 30, profile: profileDef{
+		Receipt:    "supermarket",
 		Modules:    withMods("weighing_scales", "etims"),
 		Categories: []string{"Beef", "Goat", "Pork", "Chicken", "Fish", "Offals"},
 		Settings: map[string]any{
@@ -82,6 +85,7 @@ var seedTypes = []seedType{
 		PosLayout: map[string]any{"grid_columns": 4, "weighted_items": true},
 	}},
 	{code: "liquor", name: "Liquor Store / Wines & Spirits", sort: 40, profile: profileDef{
+		Receipt:    "supermarket",
 		Modules:    retailModules,
 		Categories: []string{"Beer", "Spirits", "Wines", "Soft Drinks", "Mixers"},
 		Settings: map[string]any{
@@ -93,6 +97,7 @@ var seedTypes = []seedType{
 		PosLayout: map[string]any{"grid_columns": 4, "age_check": true},
 	}},
 	{code: "pharmacy", name: "Pharmacy / Chemist", sort: 50, profile: profileDef{
+		Receipt:    "supermarket",
 		Modules:    withMods("etims"),
 		Categories: []string{"Prescription", "OTC Medicine", "Personal Care", "Baby Care", "Supplements"},
 		Settings: map[string]any{
@@ -104,6 +109,7 @@ var seedTypes = []seedType{
 		PosLayout: map[string]any{"grid_columns": 4, "expiry_tracking": true},
 	}},
 	{code: "restaurant", name: "Restaurant / Eatery", sort: 60, profile: profileDef{
+		Receipt:    "restaurant",
 		Modules:    withMods("restaurant", "delivery"),
 		Categories: []string{"Breakfast", "Mains", "Fast Food", "Drinks", "Desserts"},
 		Settings: map[string]any{
@@ -115,6 +121,7 @@ var seedTypes = []seedType{
 		PosLayout: map[string]any{"grid_columns": 4, "tables_first": true},
 	}},
 	{code: "custom", name: "Other / Custom", sort: 90, profile: profileDef{
+		Receipt:    "supermarket",
 		Modules:    retailModules,
 		Categories: []string{"General"},
 		Settings: map[string]any{

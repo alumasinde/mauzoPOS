@@ -3,6 +3,8 @@ package pos
 import (
 	"context"
 	"time"
+
+	"mauzo/pkg/receiptfmt"
 )
 
 // SyncBundle is the full working set a terminal downloads: catalog, pricing,
@@ -24,6 +26,9 @@ type SyncBundle struct {
 	Customers    []SyncCustomer    `json:"customers"`
 	Settings     []SyncSetting     `json:"settings"`
 	Modules      []string          `json:"modules"`
+	// Receipt is the branch's print kit (layout, header, logo, policy) so
+	// the till prints identically online and offline.
+	Receipt *receiptfmt.Kit `json:"receipt,omitempty"`
 }
 
 // Cashier is a sign-in candidate with its permissions (role-derived).
@@ -107,6 +112,15 @@ func (s *Service) Sync(ctx context.Context, d Device, since time.Time, modules M
 	if b.Settings, err = s.repo.TenantSettings(ctx, d.TenantID); err != nil {
 		return b, err
 	}
-	b.Modules, err = modules.EnabledModules(ctx, d.TenantID)
-	return b, err
+	if b.Modules, err = modules.EnabledModules(ctx, d.TenantID); err != nil {
+		return b, err
+	}
+	if s.receipts != nil {
+		kit, err := s.receipts.Kit(ctx, d.TenantID, d.BranchID)
+		if err != nil {
+			return b, err
+		}
+		b.Receipt = &kit
+	}
+	return b, nil
 }

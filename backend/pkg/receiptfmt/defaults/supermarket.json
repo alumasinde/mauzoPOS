@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "paper": 80,
+  "blocks": [
+    { "type": "logo", "if": "has.logo" },
+    { "type": "text", "text": "{{business.name}}", "align": "center", "bold": true, "size": "double" },
+    { "type": "text", "text": "{{branch.name}}\n{{branch.location}}\nTel: {{branch.phone}}", "align": "center" },
+    { "type": "text", "if": "business.kra_pin", "text": "PIN: {{business.kra_pin}}", "align": "center" },
+    { "type": "divider" },
+    {
+      "type": "fields",
+      "fields": [
+        { "label": "Receipt", "value": "{{sale.receipt_no}}" },
+        { "label": "Date", "value": "{{sale.datetime}}" },
+        { "label": "Till", "value": "{{sale.terminal}}" },
+        { "label": "Served by", "value": "{{sale.cashier}}" },
+        { "label": "Customer", "value": "{{sale.customer}}" }
+      ]
+    },
+    { "type": "divider" },
+    { "type": "items", "layout": "detailed", "show_promo": true },
+    { "type": "divider" },
+    { "type": "totals", "show_item_count": true },
+    { "type": "divider" },
+    { "type": "payments" },
+    { "type": "divider", "if": "has.tax" },
+    { "type": "tax_summary", "if": "has.tax" },
+    { "type": "fiscal", "if": "has.fiscal" },
+    { "type": "divider" },
+    { "type": "text", "if": "footer", "text": "{{footer}}", "align": "center" },
+    { "type": "text", "text": "Goods once sold are not returnable without this receipt.", "align": "center" },
+    { "type": "barcode", "data": "{{sale.receipt_no}}" },
+    { "type": "text", "text": "Thank you for shopping with us!", "align": "center", "bold": true }
+  ]
+}

@@ -6,6 +6,7 @@
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import ReturnModal from './ReturnModal.svelte';
+  import SaleReceiptModal from '#lib/receipts/SaleReceiptModal.svelte';
 
   interface Props {
     open: boolean;
@@ -20,6 +21,7 @@
   let voidOpen = $state(false);
   let voidReason = $state('');
   let returnOpen = $state(false);
+  let receiptOpen = $state(false);
   let busy = $state(false);
 
   const canVoid = $derived(auth.can('sales.sale.void'));
@@ -154,6 +156,7 @@
     {/if}
 
     <div class="actions">
+      <Button variant="secondary" onclick={() => (receiptOpen = true)}>Receipt</Button>
       {#if canRefund && returnable}
         <Button variant="secondary" onclick={() => (returnOpen = true)}>Return items…</Button>
       {/if}
@@ -163,6 +166,8 @@
     </div>
   {/if}
 </Modal>
+
+<SaleReceiptModal bind:open={receiptOpen} saleId={sale?.id ?? null} />
 
 <Modal bind:open={voidOpen} title="Void sale" locked={busy}>
   <p>

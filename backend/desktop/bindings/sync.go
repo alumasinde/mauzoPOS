@@ -63,9 +63,7 @@ func (a *App) Status() Status {
 	}
 	st.Online = a.online()
 	st.LastSync, _ = a.db.Meta(a.ctx, "last_sync")
-	if p, _ := a.db.Meta(a.ctx, "printer_name"); p != "" {
-		st.Printer = "ready" // Phase 8 probes the spooler
-	}
+	st.Printer = a.printerStatus()
 	var n int
 	_ = a.db.GetContext(a.ctx, &n, `SELECT COUNT(*) FROM pending_sales WHERE uploaded = 0`)
 	st.PendingSales = n

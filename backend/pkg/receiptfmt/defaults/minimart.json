@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "paper": 58,
+  "blocks": [
+    { "type": "logo", "if": "has.logo" },
+    { "type": "text", "text": "{{business.name}}", "align": "center", "bold": true, "size": "tall" },
+    { "type": "text", "text": "{{branch.location}}\nTel: {{branch.phone}}", "align": "center" },
+    { "type": "divider" },
+    {
+      "type": "fields",
+      "fields": [
+        { "label": "No", "value": "{{sale.receipt_no}}" },
+        { "label": "Date", "value": "{{sale.datetime}}" },
+        { "label": "Cashier", "value": "{{sale.cashier}}" }
+      ]
+    },
+    { "type": "divider" },
+    { "type": "items", "layout": "compact" },
+    { "type": "divider" },
+    { "type": "totals" },
+    { "type": "payments" },
+    { "type": "divider", "if": "extra.mpesa_till" },
+    { "type": "text", "if": "extra.mpesa_till", "text": "Lipa na M-Pesa\nTill No: {{extra.mpesa_till}}", "align": "center", "bold": true },
+    { "type": "text", "if": "extra.mpesa_paybill", "text": "Paybill: {{extra.mpesa_paybill}}\nAccount: {{extra.mpesa_account}}", "align": "center", "bold": true },
+    { "type": "fiscal", "if": "has.fiscal" },
+    { "type": "divider" },
+    { "type": "text", "if": "footer", "text": "{{footer}}", "align": "center" },
+    { "type": "text", "text": "Asante! Karibu tena.", "align": "center" }
+  ]
+}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"mauzo/internal/core/authz"
 	"mauzo/internal/core/httpx"
 )
 
@@ -408,11 +409,12 @@ func (r *Repo) CashierAuthz(ctx context.Context, tenantID, userID uint64) (*Cash
 	var row struct {
 		ID          uint64  `db:"id"`
 		RoleName    string  `db:"role_name"`
+		Locked      bool    `db:"is_locked"`
 		MaxDiscount *string `db:"max_discount_percent"`
 		MaxRefund   *string `db:"max_refund_amount"`
 	}
 	err := r.conn.GetContext(ctx, &row,
-		`SELECT u.id, ro.name AS role_name, ro.max_discount_percent, ro.max_refund_amount
+		`SELECT u.id, ro.name AS role_name, ro.is_locked, ro.max_discount_percent, ro.max_refund_amount
 		 FROM users u JOIN roles ro ON ro.id = u.role_id
 		 WHERE u.id = ? AND u.tenant_id = ? AND u.status = 'active'`, userID, tenantID)
 	if err != nil {
@@ -430,6 +432,13 @@ func (r *Repo) CashierAuthz(ctx context.Context, tenantID, userID uint64) (*Cash
 	out := &CashierAuthz{UserID: row.ID, RoleName: row.RoleName, MaxDiscount: row.MaxDiscount, MaxRefund: row.MaxRefund, Perms: map[string]bool{}}
 	for _, p := range perms {
 		out.Perms[p.Permission] = true
+	}
+	// Locked roles (the owner) hold every permission implicitly and store
+	// no role_permissions rows.
+	if row.Locked {
+		for _, c := range authz.AllOf().Codes(authz.ScopeTenant) {
+			out.Perms[c] = true
+		}
 	}
 	return out, nil
 }

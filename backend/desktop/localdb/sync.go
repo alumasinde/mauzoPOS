@@ -106,6 +106,8 @@ type Bundle struct {
 		Value string `json:"value"`
 	} `json:"settings"`
 	Modules []string `json:"modules"`
+	// Receipt is the branch print kit (receiptfmt.Kit), kept verbatim in meta.
+	Receipt json.RawMessage `json:"receipt,omitempty"`
 }
 
 // ApplySync writes a bundle into the local mirror in one transaction.
@@ -135,6 +137,13 @@ func (d *DB) ApplySync(ctx context.Context, b Bundle) error {
 	}
 	if err := applyAccess(ctx, tx, b); err != nil {
 		return err
+	}
+	if len(b.Receipt) > 0 {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO meta (key, value) VALUES ('receipt_kit', ?)
+			 ON CONFLICT(key) DO UPDATE SET value = excluded.value`, string(b.Receipt)); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

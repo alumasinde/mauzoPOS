@@ -4,13 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
+
+	"mauzo/desktop/printing"
 )
 
 // TerminalSettings is the settings screen payload.
 type TerminalSettings struct {
 	DeviceName      string `json:"device_name"`
 	APIURL          string `json:"api_url"`
-	PrinterName     string `json:"printer_name"`
+	PrinterKind     string `json:"printer_kind"` // none | windows | network | file
+	PrinterName     string `json:"printer_name"` // installed printer (windows) or file path
+	PrinterHost     string `json:"printer_host"`
+	PrinterPort     int    `json:"printer_port"`
+	AutoPrint       string `json:"auto_print"`  // default | always | never
+	PaperWidth      int    `json:"paper_width"` // from the branch layout (read-only)
 	AutoLockSeconds int    `json:"auto_lock_seconds"`
 	BusinessType    string `json:"business_type"`
 	SyncCursor      string `json:"sync_cursor"`
@@ -74,7 +82,13 @@ func (a *App) GetSettings() (TerminalSettings, error) {
 	if v, _ := a.db.Meta(a.ctx, "api_url"); v != "" {
 		out.APIURL = v
 	}
-	out.PrinterName, _ = a.db.Meta(a.ctx, "printer_name")
+	pc := a.printerConfig()
+	out.PrinterKind, out.PrinterName, out.PrinterHost, out.PrinterPort = pc.Kind, pc.Name, pc.Host, pc.Port
+	out.AutoPrint = autoDefault
+	if v, _ := a.db.Meta(a.ctx, "printer_auto"); v != "" {
+		out.AutoPrint = v
+	}
+	out.PaperWidth = a.kit().ParsedTemplate().Paper
 	if v, _ := a.db.Meta(a.ctx, "auto_lock_seconds"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 15 {
 			out.AutoLockSeconds = n
@@ -88,10 +102,30 @@ func (a *App) SaveSettings(s TerminalSettings) error {
 	if a.db == nil {
 		return errors.New("local database not ready")
 	}
+	switch s.PrinterKind {
+	case printing.KindNone, printing.KindWindows, printing.KindNetwork, printing.KindFile:
+	case "":
+		s.PrinterKind = printing.KindNone
+	default:
+		return errors.New("unknown printer type")
+	}
+	switch s.AutoPrint {
+	case autoDefault, autoAlways, autoNever:
+	default:
+		s.AutoPrint = autoDefault
+	}
+	if s.PrinterPort < 0 || s.PrinterPort > 65535 {
+		return errors.New("printer port must be 1-65535")
+	}
 	pairs := map[string]string{
-		"printer_name":      s.PrinterName,
+		"printer_kind":      s.PrinterKind,
+		"printer_name":      strings.TrimSpace(s.PrinterName),
+		"printer_host":      strings.TrimSpace(s.PrinterHost),
+		"printer_port":      strconv.Itoa(s.PrinterPort),
+		"printer_auto":      s.AutoPrint,
 		"auto_lock_seconds": strconv.Itoa(s.AutoLockSeconds),
 	}
+	defer a.resetProbe()
 	if s.APIURL != "" {
 		pairs["api_url"] = s.APIURL
 		a.settings.APIBaseURL = s.APIURL

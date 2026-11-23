@@ -20,6 +20,18 @@ func init() {
 		"type": "string", "maxLength": 500})
 	coresettings.RegisterSchema("receipt.paper_width", map[string]any{
 		"type": "integer", "enum": []any{58, 80}})
+	coresettings.RegisterSchema("receipt.mpesa_till", map[string]any{
+		"type": "string", "maxLength": 20})
+	coresettings.RegisterSchema("receipt.mpesa_paybill", map[string]any{
+		"type": "string", "maxLength": 20})
+	coresettings.RegisterSchema("receipt.mpesa_account", map[string]any{
+		"type": "string", "maxLength": 40})
+	coresettings.RegisterSchema("receipt.auto_print", map[string]any{
+		"type": "boolean"})
+	coresettings.RegisterSchema("receipt.copies", map[string]any{
+		"type": "integer", "enum": []any{1, 2, 3}})
+	coresettings.RegisterSchema("receipt.open_drawer", map[string]any{
+		"type": "boolean"})
 	coresettings.RegisterSchema("profile.receipt_template", map[string]any{
 		"type": "string", "maxLength": 20000})
 	coresettings.RegisterSchema("profile.pos_layout", map[string]any{

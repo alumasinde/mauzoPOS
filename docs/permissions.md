@@ -95,7 +95,7 @@ Platform roles: **Super Admin** (all), **Support** (view + impersonate), **Billi
 | tax | `tax.category.view` / `.manage` | S | Tax categories & rates |
 | etims | `etims.invoice.view` / `.retry` | | Fiscal invoices |
 | etims | `etims.config.manage` | S | eTIMS device / config |
-| receipts | `receipts.template.manage` | | Receipt designer |
+| receipts | `receipts.template.manage` | | Receipt designer: layouts, logo, branch assignment |
 | shifts | `shifts.shift.view` | | Shifts |
 | shifts | `shifts.shift.close_others` | S | Force-close another cashier's shift |
 | shifts | `shifts.variance.approve` | S | Approve cash variance |
@@ -119,7 +119,7 @@ Platform roles: **Super Admin** (all), **Support** (view + impersonate), **Billi
 | `pos.drawer.open` | S | Open drawer with no sale |
 | `pos.cash.in_out` | S | Cash in / cash out |
 | `pos.shift.open` / `pos.shift.close` | | Own shift |
-| `pos.receipt.reprint` | S | Reprint a receipt |
+| `pos.receipt.reprint` | S | Reprint a receipt (till, or a printed copy from the back office) — numbered and audited |
 | `pos.report.x` / `pos.report.z` | S (Z) | X / Z reports |
 | `pos.supervisor.authorize` | | Can authorize **S** actions with their PIN |
 

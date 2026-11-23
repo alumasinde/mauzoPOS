@@ -10,6 +10,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"mauzo/internal/core/authz"
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/security"
 	"mauzo/internal/modules/sales"
@@ -33,9 +34,10 @@ const (
 
 // Service owns terminal activation, device auth and PIN verification.
 type Service struct {
-	conn  *sqlx.DB
-	repo  *Repo
-	sales Sales
+	conn     *sqlx.DB
+	repo     *Repo
+	sales    Sales
+	receipts Receipts
 
 	mu     sync.Mutex
 	fails  map[uint64]*pinFail
@@ -168,6 +170,13 @@ func (s *Service) SignIn(ctx context.Context, d Device, userID uint64, pin strin
 // Authorize verifies a PIN against any user holding the given permission —
 
 func (s *Service) rolePermissions(ctx context.Context, roleID uint64) ([]string, error) {
+	var locked bool
+	if err := s.conn.GetContext(ctx, &locked, `SELECT is_locked FROM roles WHERE id = ?`, roleID); err != nil {
+		return nil, err
+	}
+	if locked { // the owner: every permission, no stored rows
+		return authz.AllOf().Codes(authz.ScopeTenant), nil
+	}
 	var out []string
 	err := s.conn.SelectContext(ctx, &out,
 		`SELECT permission FROM role_permissions WHERE role_id = ?`, roleID)

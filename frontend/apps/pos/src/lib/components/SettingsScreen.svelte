@@ -8,7 +8,12 @@
   let s = $state<TerminalSettings>({
     device_name: '',
     api_url: '',
+    printer_kind: 'none',
     printer_name: '',
+    printer_host: '',
+    printer_port: 9100,
+    auto_print: 'default',
+    paper_width: 80,
     auto_lock_seconds: 120,
     business_type: '',
     sync_cursor: '',
@@ -16,11 +21,42 @@
   let msg = $state('');
   let err = $state('');
   let busy = $state(false);
+  let printers = $state<string[]>([]);
+  let testing = $state(false);
 
   onMount(async () => {
     if (!bridge) return;
     s = await bridge.GetSettings();
+    if (!s.printer_port) s.printer_port = 9100;
+    printers = await bridge.ListPrinters().catch(() => []);
   });
+
+  // Save first so the test uses what is on screen.
+  async function testPrint() {
+    if (!bridge) return;
+    testing = true;
+    err = '';
+    try {
+      await bridge.SaveSettings(s);
+      await bridge.TestPrint();
+      msg = 'Test receipt sent to the printer.';
+      setTimeout(() => (msg = ''), 4000);
+    } catch (e) {
+      err = e instanceof Error ? e.message : 'Test print failed';
+    } finally {
+      testing = false;
+    }
+  }
+
+  async function kickDrawer() {
+    if (!bridge) return;
+    err = '';
+    try {
+      await bridge.OpenDrawer();
+    } catch (e) {
+      err = e instanceof Error ? e.message : 'Could not open the drawer';
+    }
+  }
 
   async function save() {
     if (!bridge) return;
@@ -43,9 +79,56 @@
     <h1>Terminal settings</h1>
     <label>Device name <input bind:value={s.device_name} /></label>
     <label>Server address <input bind:value={s.api_url} /></label>
-    <label>
-      Receipt printer <input bind:value={s.printer_name} placeholder="Printer name (Phase 8 uses it)" />
-    </label>
+    <fieldset>
+      <legend>Receipt printer</legend>
+      <label>
+        Connection
+        <select bind:value={s.printer_kind}>
+          <option value="none">No printer</option>
+          <option value="windows">Installed in Windows (USB / Bluetooth)</option>
+          <option value="network">Network (Ethernet / Wi-Fi)</option>
+          {#if s.printer_kind === 'file'}<option value="file">File (support)</option>{/if}
+        </select>
+      </label>
+      {#if s.printer_kind === 'windows'}
+        <label>
+          Printer
+          <select bind:value={s.printer_name}>
+            <option value="">Choose a printer…</option>
+            {#each printers as p (p)}<option value={p}>{p}</option>{/each}
+            {#if s.printer_name && !printers.includes(s.printer_name)}
+              <option value={s.printer_name}>{s.printer_name} (not found)</option>
+            {/if}
+          </select>
+        </label>
+        <p class="hint">
+          Install the printer's driver (or Windows "Generic / Text Only"). Receipts are sent raw, so driver
+          paper settings do not matter.
+        </p>
+      {:else if s.printer_kind === 'network'}
+        <div class="two">
+          <label>IP address <input bind:value={s.printer_host} placeholder="192.168.1.50" /></label>
+          <label>Port <input type="number" min="1" max="65535" bind:value={s.printer_port} /></label>
+        </div>
+      {/if}
+      <label>
+        Print after each sale
+        <select bind:value={s.auto_print}>
+          <option value="default">Use the business setting</option>
+          <option value="always">Always print</option>
+          <option value="never">Only when the cashier presses Print</option>
+        </select>
+      </label>
+      <p class="hint">Receipt layout: {s.paper_width} mm (set in the back office).</p>
+      {#if s.printer_kind !== 'none'}
+        <div class="row tight">
+          <button class="ghost" onclick={testPrint} disabled={testing}>
+            {testing ? 'Printing…' : 'Print test receipt'}
+          </button>
+          <button class="ghost" onclick={kickDrawer}>Open cash drawer</button>
+        </div>
+      {/if}
+    </fieldset>
     <label>
       Auto-lock after
       <select bind:value={s.auto_lock_seconds}>
@@ -79,6 +162,8 @@
   }
   .card {
     width: min(480px, 94vw);
+    max-height: 94vh;
+    overflow-y: auto;
     padding: var(--space-6);
     background: var(--color-surface);
     border-radius: var(--radius-lg);
@@ -101,6 +186,30 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-sizing: border-box;
+  }
+  fieldset {
+    margin: var(--space-4) 0 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  legend {
+    font-weight: 700;
+    padding: 0 var(--space-1);
+  }
+  .two {
+    display: grid;
+    grid-template-columns: 1fr 110px;
+    gap: var(--space-2);
+  }
+  .hint {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+  .row.tight {
+    justify-content: flex-start;
+    margin-top: var(--space-3);
   }
   dl {
     display: grid;

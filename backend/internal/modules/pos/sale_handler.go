@@ -81,6 +81,7 @@ func (h *Handler) Sale(w http.ResponseWriter, r *http.Request) {
 		"sale":         sales.ToDetail(detail),
 		"receipt_no":   detail.Sale.ReceiptNo,
 		"deduplicated": deduped,
+		"receipt":      h.svc.issueReceipt(r.Context(), d, detail, cashierID),
 	})
 }
 

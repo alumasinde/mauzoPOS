@@ -39,6 +39,7 @@ func DeviceRoutes(r chi.Router, h *Handler) {
 	r.Post("/heartbeat", h.Heartbeat)
 	r.Post("/sales", h.Sale)
 	r.Get("/sales/{ref}", h.SaleLookup)
+	r.Post("/sales/{ref}/reprint", h.Reprint)
 	r.Get("/sync", h.Sync)
 	r.Post("/signin", h.SignIn)
 	r.Post("/authorize", h.Authorize)

@@ -23,7 +23,7 @@ export interface ServerStatus {
 export interface Status {
   online: boolean;
   last_sync: string;
-  printer: string; // none | ready | not_configured
+  printer: string; // ready | offline | not_configured
   pending_sales: number;
 }
 
@@ -131,7 +131,21 @@ export interface PayResult {
   total: string;
   change_due: string;
   offline: boolean;
+  /** The receipt printed automatically. */
+  printed: boolean;
+  /** PrintLast() has an unprinted receipt for this sale. */
+  can_print: boolean;
+  print_error?: string;
 }
+
+export interface ReprintResult {
+  copy_no: number;
+  printed: boolean;
+  error?: string;
+}
+
+export type PrinterKind = 'none' | 'windows' | 'network' | 'file';
+export type AutoPrint = 'default' | 'always' | 'never';
 
 export interface AuthorizeResult {
   name: string;
@@ -161,7 +175,14 @@ export interface POSLayout {
 export interface TerminalSettings {
   device_name: string;
   api_url: string;
+  printer_kind: PrinterKind;
+  /** Installed Windows printer, or a file path for the file printer. */
   printer_name: string;
+  printer_host: string;
+  printer_port: number;
+  auto_print: AutoPrint;
+  /** Paper width of the branch receipt layout (read-only). */
+  paper_width: number;
   auto_lock_seconds: number;
   business_type: string;
   sync_cursor: string;
@@ -216,6 +237,11 @@ interface DesktopApp {
   GetSettings(): Promise<TerminalSettings>;
   Layout(): Promise<POSLayout>;
   SaveSettings(s: TerminalSettings): Promise<void>;
+  ListPrinters(): Promise<string[]>;
+  TestPrint(): Promise<void>;
+  PrintLast(): Promise<void>;
+  Reprint(ref: string, grant: string): Promise<ReprintResult>;
+  OpenDrawer(): Promise<void>;
 }
 
 declare global {

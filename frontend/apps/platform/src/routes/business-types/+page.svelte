@@ -240,7 +240,7 @@
     border-radius: 6px;
     font: inherit;
     background: var(--surface, #fff);
-    color: inherit;
+    color: #000000;
   }
   .check {
     display: flex;

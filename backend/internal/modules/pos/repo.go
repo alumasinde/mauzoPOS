@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"mauzo/internal/core/authz"
 	"mauzo/internal/core/db"
 )
 
@@ -250,6 +251,16 @@ func (r *Repo) CashierPermissions(ctx context.Context, tenantID uint64) (map[uin
 	for _, row := range rows {
 		out[row.UserID] = append(out[row.UserID], row.Permission)
 	}
+	// Locked roles (the owner) hold every permission and store no rows.
+	var owners []uint64
+	if err := r.conn.SelectContext(ctx, &owners,
+		`SELECT u.id FROM users u JOIN roles ro ON ro.id = u.role_id
+		 WHERE u.tenant_id = ? AND u.status = 'active' AND ro.is_locked = 1`, tenantID); err != nil {
+		return nil, err
+	}
+	for _, id := range owners {
+		out[id] = authz.AllOf().Codes(authz.ScopeTenant)
+	}
 	return out, nil
 }
 
@@ -287,8 +298,9 @@ func (r *Repo) UsersWithPermission(ctx context.Context, tenantID uint64, perm st
 	err := r.conn.SelectContext(ctx, &out,
 		`SELECT u.id, u.public_id, u.name, ro.name AS role_name, u.pin_hash, u.all_branches
 		 FROM users u JOIN roles ro ON ro.id = u.role_id
-		 JOIN role_permissions rp ON rp.role_id = ro.id AND rp.permission = ?
-		 WHERE u.tenant_id = ? AND u.status = 'active' AND u.pin_hash IS NOT NULL`,
+		 LEFT JOIN role_permissions rp ON rp.role_id = ro.id AND rp.permission = ?
+		 WHERE u.tenant_id = ? AND u.status = 'active' AND u.pin_hash IS NOT NULL
+		   AND (rp.permission IS NOT NULL OR ro.is_locked = 1)`,
 		perm, tenantID)
 	return out, err
 }

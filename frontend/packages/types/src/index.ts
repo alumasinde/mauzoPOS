@@ -222,3 +222,4 @@ export * from './catalog';
 export * from './inventory';
 export * from './pricing';
 export * from './sales';
+export * from './receipts';

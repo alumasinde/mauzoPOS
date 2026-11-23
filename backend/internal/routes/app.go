@@ -24,6 +24,7 @@ import (
 	"mauzo/internal/modules/onboarding"
 	"mauzo/internal/modules/pos"
 	"mauzo/internal/modules/pricing"
+	"mauzo/internal/modules/receipts"
 	"mauzo/internal/modules/registry"
 	"mauzo/internal/modules/roles"
 	"mauzo/internal/modules/sales"
@@ -98,6 +99,7 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 		pricing.TenantRoutes(r, c.Pricing)
 		customers.TenantRoutes(r, c.Customers)
 		sales.TenantRoutes(r, c.Sales)
+		receipts.TenantRoutes(r, c.Receipts)
 		onboarding.TenantRoutes(r, c.Onboarding)
 	})
 }
