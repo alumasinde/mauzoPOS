@@ -24,15 +24,40 @@ const (
 )
 
 // NavItem is one back-office sidebar entry contributed by a module. It is
-// shown when the module is enabled and the user holds Permission.
+// shown when the module is enabled and the user holds Permission. Entries may
+// point at screens the frontend has not shipped yet: the web app shows those
+// as "coming soon" until the page exists, so the sidebar keeps its final shape
+// as modules are built.
 type NavItem struct {
 	Key        string `json:"key"`
 	Label      string `json:"label"`
-	Path       string `json:"path"`
+	Path       string `json:"path"` // may carry a query, e.g. /inventory?tab=movements
 	Icon       string `json:"icon"`
+	Section    string `json:"section"` // a NavSection key; "" = top of the sidebar
 	Permission string `json:"-"`
-	Order      int    `json:"-"`
+	Order      int    `json:"-"` // position within the section
 }
+
+// Widget is one dashboard card contributed by a module. Like NavItem it is
+// shown when the module is enabled and the user holds Permission; the web app
+// maps Key to a component and renders a placeholder until that exists.
+type Widget struct {
+	Key        string     `json:"key"`
+	Title      string     `json:"title"`
+	Size       WidgetSize `json:"size"`
+	Permission string     `json:"-"`
+	Order      int        `json:"order"`
+}
+
+// WidgetSize controls where and how wide a widget is laid out.
+type WidgetSize string
+
+// Widget sizes.
+const (
+	WidgetKPI    WidgetSize = "kpi"    // headline figure in the top row
+	WidgetWide   WidgetSize = "wide"   // two thirds of a panel row
+	WidgetNarrow WidgetSize = "narrow" // one third of a panel row
+)
 
 // Module describes one enableable feature area.
 type Module struct {
@@ -50,8 +75,10 @@ type Module struct {
 	RecommendedFor []string
 	// ConfigSchema validates tenant_modules.config (core/settings subset).
 	ConfigSchema map[string]any
-	// Nav entries (only for screens that exist).
+	// Nav entries, grouped into sidebar sections.
 	Nav []NavItem
+	// Widgets this module contributes to the dashboard.
+	Widgets []Widget
 }
 
 var (
@@ -69,8 +96,33 @@ func register(mods ...Module) {
 	}
 }
 
-// validateGraph panics on unknown dependencies or cycles (boot-time check).
+// validateGraph panics on unknown dependencies or cycles, and on nav or widget
+// entries that are malformed or duplicated (boot-time check).
 func validateGraph() {
+	navKeys, widgetKeys := map[string]bool{}, map[string]bool{}
+	for _, code := range order {
+		m := byCode[code]
+		for _, n := range m.Nav {
+			if _, ok := SectionByKey(n.Section); !ok {
+				panic(fmt.Sprintf("modules: nav %q has unknown section %q", n.Key, n.Section))
+			}
+			if navKeys[n.Key] {
+				panic(fmt.Sprintf("modules: duplicate nav key %q", n.Key))
+			}
+			navKeys[n.Key] = true
+		}
+		for _, w := range m.Widgets {
+			switch w.Size {
+			case WidgetKPI, WidgetWide, WidgetNarrow:
+			default:
+				panic(fmt.Sprintf("modules: widget %q has unknown size %q", w.Key, w.Size))
+			}
+			if widgetKeys[w.Key] {
+				panic(fmt.Sprintf("modules: duplicate widget key %q", w.Key))
+			}
+			widgetKeys[w.Key] = true
+		}
+	}
 	for _, code := range order {
 		for _, d := range byCode[code].Depends {
 			if _, ok := byCode[d]; !ok {

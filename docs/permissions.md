@@ -79,9 +79,9 @@ Platform roles: **Super Admin** (all), **Support** (view + impersonate), **Billi
 | inventory | `inventory.transfer.create` / `.receive` | | Branch transfers |
 | inventory | `inventory.stocktake.manage` | | Stocktaking |
 | inventory | `inventory.wastage.create` | S | Record wastage |
-| purchasing | `purchasing.supplier.manage` | | Suppliers |
-| purchasing | `purchasing.order.create` / `.approve` | | Purchase orders |
-| purchasing | `purchasing.grn.create` | | Receive goods |
+| purchasing | `purchasing.supplier.view` / `.manage` | | Suppliers |
+| purchasing | `purchasing.order.view` / `.create` / `.approve` | | Purchase orders |
+| purchasing | `purchasing.grn.view` / `.create` | | Receive goods |
 | sales | `sales.sale.view` | | Sales & transactions (own branch) |
 | sales | `sales.sale.view_all_branches` | | Cross-branch sales |
 | sales | `sales.sale.void` | S | Void a completed sale |

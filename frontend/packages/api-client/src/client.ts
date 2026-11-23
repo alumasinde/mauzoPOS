@@ -8,6 +8,8 @@ export interface ClientOptions {
   getToken?: () => string | null | undefined;
   /** Called on 401 so the app can redirect to login. */
   onUnauthorized?: () => void;
+  /** Extra headers sent with every request, e.g. the selected X-Branch-Id. */
+  getHeaders?: () => Record<string, string>;
   timeoutMs?: number;
   fetch?: typeof fetch;
 }
@@ -33,6 +35,7 @@ export function createClient(opts: ClientOptions) {
     if (ro.idempotencyKey) headers['Idempotency-Key'] = ro.idempotencyKey;
     const token = opts.getToken?.();
     if (token) headers['Authorization'] = `Bearer ${token}`;
+    Object.assign(headers, opts.getHeaders?.());
 
     const timeout = AbortSignal.timeout(timeoutMs);
     const signal = ro.signal ? AbortSignal.any([ro.signal, timeout]) : timeout;

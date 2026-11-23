@@ -122,7 +122,7 @@ func (h *Handler) Navigation(w http.ResponseWriter, r *http.Request) {
 	if items == nil {
 		items = []modules.NavItem{}
 	}
-	httpx.OK(w, NavResponse{Items: items})
+	httpx.OK(w, NavResponse{Items: items, Sections: modules.Sections()})
 }
 
 // PlatformList handles GET /platform/modules.

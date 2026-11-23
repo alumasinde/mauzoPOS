@@ -12,11 +12,19 @@ import (
 	_ "mauzo/internal/modules/branches"      // permissions
 	_ "mauzo/internal/modules/businesstypes" // permissions
 	_ "mauzo/internal/modules/catalog"       // permissions
-	_ "mauzo/internal/modules/dashboard"     // permissions
+	_ "mauzo/internal/modules/dashboard"     // permissions + widgets
+	_ "mauzo/internal/modules/inventory"     // permissions
+	_ "mauzo/internal/modules/mpesa"         // permissions (module pending)
 	_ "mauzo/internal/modules/onboarding"    // routes
+	_ "mauzo/internal/modules/payments"      // permissions (module pending)
 	_ "mauzo/internal/modules/pos"           // permissions
+	_ "mauzo/internal/modules/pricing"       // permissions
+	_ "mauzo/internal/modules/purchasing"    // permissions (module pending)
+	_ "mauzo/internal/modules/receipts"      // permissions (module pending)
 	_ "mauzo/internal/modules/registry"      // permissions
+	_ "mauzo/internal/modules/reports"       // permissions (module pending)
 	_ "mauzo/internal/modules/roles"         // permissions
+	_ "mauzo/internal/modules/sales"         // permissions (module pending)
 	_ "mauzo/internal/modules/settings"      // permissions + settings schemas
 	_ "mauzo/internal/modules/subscriptions" // permissions
 	_ "mauzo/internal/modules/tenants"       // permissions

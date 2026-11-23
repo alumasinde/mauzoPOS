@@ -24,6 +24,7 @@ type Account struct {
 	RoleID        uint64 // tenant roles.id (0 for platform accounts)
 	AllBranches   bool   // tenant users: access to every branch
 	Role          string
+	RoleName      string // tenant role display name ("" for platform accounts)
 	Status        string
 	TOTPSecret    *string
 	TOTPEnabled   bool

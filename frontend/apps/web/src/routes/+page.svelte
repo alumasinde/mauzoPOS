@@ -1,14 +1,74 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
-  import type { OnboardingState } from '@mauzo/types';
-  import { auth } from '#lib/auth.svelte.ts';
+  import { ApiError } from '@mauzo/api-client';
+  import type { DashboardWidget, OnboardingState } from '@mauzo/types';
+  import { Icon } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
+  import { auth } from '#lib/auth.svelte.ts';
+  import { branch } from '#lib/branch.svelte.ts';
+  import KpiWidget from '#lib/dashboard/KpiWidget.svelte';
+  import WidgetCard from '#lib/dashboard/WidgetCard.svelte';
+  import { PERIODS, type Period } from '#lib/dashboard/period.ts';
+  import { WIDGETS } from '#lib/dashboard/registry.ts';
+  import type { KpiEntry, PanelEntry } from '#lib/dashboard/types.ts';
 
+  const PERIOD_KEY = 'mauzo_dashboard_period';
+
+  let widgets = $state<DashboardWidget[]>([]);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
   let pendingSetup = $state(false);
+  let period = $state<Period>(readPeriod());
+
+  const firstName = $derived(auth.user?.name?.split(/\s+/)[0] ?? '');
+  const where = $derived(branch.current?.name ?? (branch.allowAll ? 'all your branches' : 'your store'));
+  const when = $derived(
+    period === 'today' ? 'today' : `over the ${PERIODS.find((p) => p.key === period)?.label.toLowerCase()}`,
+  );
+
+  // Widgets the API allows × widgets this app knows how to draw.
+  const kpis = $derived(
+    widgets.flatMap((w) => {
+      const e = WIDGETS[w.key];
+      return e?.kind === 'kpi' ? [{ w, e }] : [];
+    }) as { w: DashboardWidget; e: KpiEntry }[],
+  );
+  const panels = $derived(
+    widgets.flatMap((w) => {
+      const e = WIDGETS[w.key];
+      return e?.kind === 'panel' ? [{ w, e }] : [];
+    }) as { w: DashboardWidget; e: PanelEntry }[],
+  );
+
+  function readPeriod(): Period {
+    try {
+      const p = localStorage.getItem(PERIOD_KEY);
+      if (PERIODS.some((x) => x.key === p)) return p as Period;
+    } catch {
+      /* default */
+    }
+    return 'today';
+  }
+
+  function setPeriod(p: Period) {
+    period = p;
+    try {
+      localStorage.setItem(PERIOD_KEY, p);
+    } catch {
+      /* not persisted */
+    }
+  }
 
   onMount(async () => {
-    if (auth.user?.role !== 'owner' && auth.user?.role !== 'admin') return;
+    try {
+      widgets = (await api.get<{ widgets: DashboardWidget[] }>('/api/v1/t/dashboard')).widgets;
+    } catch (e) {
+      error = e instanceof ApiError ? e.message : 'Could not load the dashboard';
+    } finally {
+      loading = false;
+    }
+    if (!auth.can('settings.business.update')) return;
     try {
       const st = await api.get<OnboardingState>('/api/v1/t/onboarding');
       pendingSetup = !!st && !st.done;
@@ -19,81 +79,176 @@
 </script>
 
 <section class="head">
-  <h1>Dashboard</h1>
-  <p class="muted">Welcome back, {auth.user?.name}.</p>
+  <span class="mark" aria-hidden="true"><Icon name="dashboard" size={34} strokeWidth={2.6} /></span>
+  <div class="titles">
+    <h1>Dashboard</h1>
+    <p>Welcome back{firstName ? `, ${firstName}` : ''}! Here's what's happening at {where} {when}.</p>
+  </div>
+  <label class="period">
+    <Icon name="calendar" size={18} />
+    <span class="sr">Period</span>
+    <select value={period} onchange={(e) => setPeriod(e.currentTarget.value as Period)}>
+      {#each PERIODS as p (p.key)}
+        <option value={p.key}>{p.label}</option>
+      {/each}
+    </select>
+    <Icon name="chevron-down" size={16} />
+  </label>
 </section>
 
 {#if pendingSetup}
-  <a class="banner" href={resolve('/onboarding')}>Finish business setup →</a>
+  <a class="banner" href={resolve('/onboarding')}>
+    <Icon name="rocket" size={20} /> Finish business setup <Icon name="arrow-right" size={18} />
+  </a>
 {/if}
 
-<div class="grid">
-  <section class="card">
-    <h2>Business</h2>
-    <dl>
-      <dt>Name</dt>
-      <dd>{auth.user?.tenant?.name ?? '—'}</dd>
-      <dt>Company code</dt>
-      <dd>{auth.user?.tenant?.slug ?? '—'}</dd>
-    </dl>
-  </section>
-  <section class="card">
-    <h2>Your account</h2>
-    <dl>
-      <dt>Role</dt>
-      <dd>{auth.user?.role ?? '—'}</dd>
-      <dt>Sign-in identity</dt>
-      <dd>{auth.user?.identity ?? '—'}</dd>
-    </dl>
-  </section>
-</div>
+{#if loading}
+  <p class="muted">Loading…</p>
+{:else if error}
+  <p class="err">{error}</p>
+{:else if kpis.length === 0 && panels.length === 0}
+  <WidgetCard title="Nothing to show yet">
+    <p class="muted">
+      Your dashboard fills in as modules are switched on and your role allows you to see them.
+      {#if auth.can('settings.module.manage')}
+        <a href={resolve('/modules')}>Manage modules</a>
+      {/if}
+    </p>
+  </WidgetCard>
+{:else}
+  <!-- Re-mount widgets when the period changes so each refetches. -->
+  {#key period}
+    {#if kpis.length}
+      <section class="kpis" aria-label="Key figures">
+        {#each kpis as { w, e } (w.key)}
+          <KpiWidget entry={e} widget={w} {period} branchId={branch.id} />
+        {/each}
+      </section>
+    {/if}
+    {#if panels.length}
+      <section class="panels">
+        {#each panels as { w, e } (w.key)}
+          <div class="slot {w.size}">
+            {#if e.component}
+              <e.component widget={w} {period} branchId={branch.id} />
+            {:else}
+              <WidgetCard title={w.title} pending={e.pending} />
+            {/if}
+          </div>
+        {/each}
+      </section>
+    {/if}
+  {/key}
+{/if}
 
 <style>
-  .head h1 {
-    margin: 0 0 var(--space-1);
+  .head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+    flex-wrap: wrap;
   }
-  .muted {
+  .mark {
+    color: var(--color-primary);
+  }
+  .titles {
+    flex: 1;
+    min-width: 220px;
+  }
+  h1 {
+    margin: 0;
+    font-size: var(--text-2xl);
+    letter-spacing: -0.01em;
+  }
+  .titles p {
+    margin: 2px 0 0;
     color: var(--color-text-muted);
   }
+  .period {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: 600;
+  }
+  .period select {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    padding-right: var(--space-1);
+    cursor: pointer;
+  }
+  .period select option {
+    color: var(--color-text);
+    background: var(--color-surface);
+  }
+  .period:focus-within {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .period select:focus-visible {
+    outline: none;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
   .banner {
-    display: block;
-    margin-top: var(--space-4);
-    padding: var(--space-4) var(--space-5);
-    background: #eff6ff;
-    color: var(--color-primary, #2563eb);
-    border: 1px solid #bfdbfe;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+    padding: var(--space-3) var(--space-5);
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+    color: var(--color-primary);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
     border-radius: var(--radius-lg);
     text-decoration: none;
     font-weight: 600;
   }
-  .grid {
+  .kpis {
     display: grid;
-    gap: var(--space-5);
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    margin-top: var(--space-5);
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
   }
-  .card {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
-    box-shadow: var(--shadow-sm);
-  }
-  .card h2 {
-    margin: 0 0 var(--space-3);
-    font-size: var(--text-lg);
-  }
-  dl {
-    margin: 0;
+  .panels {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-2) var(--space-4);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
   }
-  dt {
+  .slot.wide {
+    grid-column: span 2;
+  }
+  .muted {
     color: var(--color-text-muted);
-    font-size: var(--text-sm);
   }
-  dd {
-    margin: 0;
+  .err {
+    color: var(--color-danger);
+  }
+
+  @media (max-width: 1280px) {
+    .panels {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 720px) {
+    .panels {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .slot.wide {
+      grid-column: auto;
+    }
   }
 </style>

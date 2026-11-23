@@ -62,6 +62,7 @@ type ProfileResponse struct {
 	Name       string     `json:"name"`
 	Identity   string     `json:"identity"`
 	Role       string     `json:"role"`
+	RoleName   string     `json:"role_name,omitempty"`
 	MFAEnabled bool       `json:"mfa_enabled"`
 	Tenant     *TenantRef `json:"tenant,omitempty"`
 	// Permissions the user effectively holds (module-gated for tenant users).
@@ -128,6 +129,7 @@ func profileResponse(acct Account, t *TenantInfo, access identity.Access) *Profi
 		Name:        acct.Name,
 		Identity:    acct.Identity,
 		Role:        acct.Role,
+		RoleName:    acct.RoleName,
 		MFAEnabled:  acct.TOTPEnabled,
 		Permissions: effectivePermissions(acct, access),
 		AllBranches: access.AllBranches,

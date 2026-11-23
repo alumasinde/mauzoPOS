@@ -86,7 +86,7 @@ func (s *Service) SetPlatformActive(ctx context.Context, code string, active boo
 }
 
 // Navigation returns the sidebar entries the actor may see: items of enabled
-// modules whose permission the actor holds, ordered.
+// modules whose permission the actor holds, ordered by section then position.
 func Navigation(a identity.Actor) []modules.NavItem {
 	var out []modules.NavItem
 	for _, m := range modules.All() {
@@ -99,6 +99,13 @@ func Navigation(a identity.Actor) []modules.NavItem {
 			}
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Order < out[j].Order })
+	sort.SliceStable(out, func(i, j int) bool {
+		si, _ := modules.SectionByKey(out[i].Section)
+		sj, _ := modules.SectionByKey(out[j].Section)
+		if si != sj {
+			return si < sj
+		}
+		return out[i].Order < out[j].Order
+	})
 	return slices.Clip(out)
 }

@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { ApiError } from '@mauzo/api-client';
   import type {
     Branch,
@@ -12,6 +14,7 @@
   import { Button, Pager, toast } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
+  import { branch } from '#lib/branch.svelte.ts';
   import StockOpModal from '#lib/inventory/StockOpModal.svelte';
   import ReportTabs from '#lib/inventory/ReportTabs.svelte';
   import LedgerTabs from '#lib/inventory/LedgerTabs.svelte';
@@ -27,7 +30,13 @@
   };
   let branches = $state<Branch[]>([]);
   let branchId = $state('');
-  let tab = $state<Tab>('stock');
+  const TABS: Tab[] = ['stock', 'movements', 'reorders', 'valuation'];
+  const urlTab = (): Tab => {
+    const t = page.url.searchParams.get('tab');
+    return TABS.includes(t as Tab) ? (t as Tab) : 'stock';
+  };
+  let tab = $state<Tab>(urlTab());
+  let mounted = false;
 
   let balances = $state<StockBalance[]>([]);
   let movements = $state<StockMovement[]>([]);
@@ -80,19 +89,32 @@
     }
   }
 
+  // Tabs live in the URL (?tab=) so sidebar links like "Stock movements"
+  // land on the right one; the effect reacts to both kinds of navigation.
   function switchTab(t: Tab) {
-    tab = t;
-    pageNum = 1;
-    load();
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only change on this page
+    goto(t === 'stock' ? '?' : `?tab=${t}`, { replace: true, reset: false });
   }
+
+  $effect(() => {
+    const next = urlTab();
+    untrack(() => {
+      if (!mounted || next === tab) return;
+      tab = next;
+      pageNum = 1;
+      load();
+    });
+  });
 
   onMount(async () => {
     try {
-      branches = await api.get<Branch[]>('/api/v1/t/branches');
-      branchId = branches[0]?.id ?? '';
+      branches = await api.get<Branch[]>('/api/v1/t/branches/accessible');
+      // Start on the branch picked in the top bar ("" = all branches).
+      branchId = branch.id ?? '';
     } catch {
       /* branch picker optional */
     }
+    mounted = true;
     await Promise.all([load(), loadAlerts()]);
   });
 </script>

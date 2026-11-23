@@ -1,41 +1,30 @@
 <script lang="ts">
   import '@mauzo/ui/tokens.css';
   import { Toaster } from '@mauzo/ui';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { auth } from '#lib/auth.svelte.ts';
+  import { branch } from '#lib/branch.svelte.ts';
   import { nav } from '#lib/nav.svelte.ts';
+  import Sidebar from '#lib/shell/Sidebar.svelte';
+  import Topbar from '#lib/shell/Topbar.svelte';
 
   let { children } = $props();
-
-  // Pages this app ships. Server nav entries for anything else are ignored,
-  // so a module can never link to a screen that does not exist yet.
-  const ROUTES = [
-    '/',
-    '/onboarding',
-    '/modules',
-    '/settings',
-    '/audit',
-    '/employees',
-    '/roles',
-    '/catalog',
-    '/catalog/taxonomy',
-    '/catalog/labels',
-    '/inventory',
-    '/inventory/documents',
-    '/pricing',
-    '/pricing/promotions',
-    '/pricing/history',
-  ] as const;
-  type AppRoute = (typeof ROUTES)[number];
-  const isRoute = (p: string): p is AppRoute => (ROUTES as readonly string[]).includes(p);
+  let drawer = $state(false);
 
   // The sidebar follows the user's permissions and the tenant's modules.
   $effect(() => {
     if (auth.user) nav.load();
     else nav.clear();
+  });
+
+  // The branch picker follows who is signed in (not every /me refresh).
+  const userId = $derived(auth.user?.id ?? null);
+  $effect(() => {
+    if (!userId) return untrack(() => branch.clear());
+    untrack(() => branch.load(auth.user?.all_branches ?? false));
   });
 
   onMount(() => auth.init());
@@ -54,32 +43,20 @@
   {@render children()}
 {:else}
   <div class="shell">
-    <aside class="side">
-      <div class="brand">
-        <strong>Mauzo</strong>
-        <span>{auth.user?.tenant?.name ?? 'Back office'}</span>
-      </div>
-      <nav>
-        {#each nav.items as item (item.key)}
-          {#if isRoute(item.path)}
-            <a href={resolve(item.path)} class:active={page.url.pathname === item.path}>{item.label}</a>
-          {/if}
-        {/each}
-        <a href={resolve('/account')} class:active={page.url.pathname === '/account'}>Account</a>
-      </nav>
-    </aside>
+    <Sidebar open={drawer} onnavigate={() => (drawer = false)} />
+    {#if drawer}
+      <button class="scrim" aria-label="Close navigation" onclick={() => (drawer = false)}></button>
+    {/if}
     <div class="main">
-      <header class="topbar">
-        <span></span>
-        <div class="who">
-          {#if auth.user}
-            <span class="name">{auth.user.name}</span>
-            <span class="role">{auth.user.role}</span>
-          {/if}
-          <button class="out" onclick={() => auth.logout()}>Sign out</button>
-        </div>
-      </header>
-      <main>{@render children()}</main>
+      <Topbar onmenu={() => (drawer = true)} />
+      <main>
+        {#if branch.loaded}
+          <!-- Re-mount the page when the branch changes so it refetches. -->
+          {#key branch.id}
+            {@render children()}
+          {/key}
+        {/if}
+      </main>
     </div>
   </div>
 {/if}
@@ -97,89 +74,34 @@
     display: flex;
     min-height: 100vh;
   }
-  .side {
-    width: 220px;
-    background: var(--color-header);
-    color: var(--color-header-text);
-    display: flex;
-    flex-direction: column;
-    padding: var(--space-4) 0;
-  }
-  .brand {
-    display: flex;
-    flex-direction: column;
-    padding: 0 var(--space-5) var(--space-4);
-  }
-  .brand strong {
-    font-size: var(--text-xl);
-  }
-  .brand span {
-    font-size: var(--text-xs);
-    opacity: 0.7;
-  }
-  nav {
-    display: flex;
-    flex-direction: column;
-  }
-  nav a {
-    padding: var(--space-3) var(--space-5);
-    color: inherit;
-    text-decoration: none;
-    opacity: 0.85;
-  }
-  nav a:hover {
-    background: rgb(255 255 255 / 0.08);
-  }
-  nav a.active {
-    background: rgb(255 255 255 / 0.14);
-    opacity: 1;
-    font-weight: 600;
-  }
   .main {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
   }
-  .topbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-3) var(--space-5);
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-  }
-  .who {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .who .name {
-    font-weight: 600;
-  }
-  .who .role {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-text-muted);
-  }
-  .out {
-    border: 1px solid var(--color-border);
-    background: none;
-    border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    font-size: var(--text-sm);
-    cursor: pointer;
-    color: var(--color-text);
-  }
-  .out:hover {
-    background: var(--color-surface-muted);
-  }
   main {
     padding: var(--space-5);
-    max-width: 1100px;
+    max-width: 1480px;
     width: 100%;
     margin: 0 auto;
+  }
+  .scrim {
+    display: none;
+  }
+  @media (max-width: 960px) {
+    .scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 35;
+      border: 0;
+      background: rgb(0 0 0 / 0.45);
+    }
+  }
+  @media (max-width: 640px) {
+    main {
+      padding: var(--space-3);
+    }
   }
 </style>

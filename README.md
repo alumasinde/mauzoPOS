@@ -212,7 +212,8 @@ func Routes(r chi.Router, h *Handlers) {
 See [ADR 0001](docs/adr/0001-module-registry-and-rbac.md) for the full design.
 
 - **Modules** are defined in `core/modules/catalogue.go`. Each has a code, dependencies, a config
-  schema, sidebar `Nav` entries, and the business types it is recommended for. Feature code asks
+  schema, sidebar `Nav` entries (grouped into sections from `core/modules/sections.go`), dashboard
+  `Widgets`, and the business types it is recommended for. Feature code asks
   whether a module is enabled (`mw.RequireModule`, `actor.HasModule`) and **never checks business
   types**.
 - **Effective modules** for a tenant are: core modules, plus the tenant's enabled modules, limited to
@@ -238,11 +239,17 @@ See [ADR 0001](docs/adr/0001-module-registry-and-rbac.md) for the full design.
 
 ### Adding a feature module (checklist)
 
-1. Add the module to `core/modules/catalogue.go` (deps, config schema, `Nav` only once its page exists).
+1. Add the module to `core/modules/catalogue.go`: deps, config schema, `Nav` entries (with a
+   `Section`) and dashboard `Widgets`. Both can be declared before the screens exist: the sidebar
+   shows unbuilt pages as "Soon" and the dashboard shows a placeholder card, so the layout keeps
+   its final shape.
 2. Create `internal/modules/<name>/permissions.go` with `authz.Define(...)` and the right `Module`.
-3. Import the package in `internal/modules/registerall`.
+3. Import the package in `internal/modules/registerall` (a test fails if a nav or widget permission
+   is not defined).
 4. Guard routes with `mw.Can(Perm...)`, which also enforces the module.
-5. Add the page to the web app's `ROUTES` list in `+layout.svelte`.
+5. Web: add the page path to `ROUTES` in `apps/web/src/lib/shell/routes.ts` (the sidebar entry
+   becomes a link), and wire the module's widgets in `apps/web/src/lib/dashboard/registry.ts`
+   (`load` for a KPI, `component` for a panel).
 
 The full catalogue is in [docs/permissions.md](docs/permissions.md).
 

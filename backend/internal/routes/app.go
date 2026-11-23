@@ -18,6 +18,7 @@ import (
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
 	"mauzo/internal/modules/catalog"
+	"mauzo/internal/modules/dashboard"
 	"mauzo/internal/modules/inventory"
 	"mauzo/internal/modules/onboarding"
 	"mauzo/internal/modules/pricing"
@@ -82,6 +83,7 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 		r.Use(mw.BranchScope(c.BranchSvc))
 		auth.PrivateRoutes(r, c.Auth)
 		auditmod.TenantRoutes(r, c.AuditLogs)
+		dashboard.TenantRoutes(r)
 		registry.TenantRoutes(r, c.Modules)
 		roles.TenantRoutes(r, c.Roles)
 		users.TenantRoutes(r, c.Employees)

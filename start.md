@@ -6,3 +6,7 @@ cd C:\projects\mauzoPOS\frontend
 pnpm dev:web                     # serves the back-office UI on http://localhost:5173
 
 Company: demo · Identity: owner@demo.local · Password: ChangeMe123!
+
+
+netstat -ano | findstr :8080          # note the PID in the last column
+taskkill /PID <pid> /F

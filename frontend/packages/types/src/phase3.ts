@@ -6,8 +6,32 @@ import type { MoneyString } from './index';
 export interface NavItem {
   key: string;
   label: string;
+  /** May carry a query, e.g. "/inventory?tab=movements". */
   path: string;
   icon: string;
+  /** NavSection key; "" = above every heading. */
+  section: string;
+}
+
+/** A sidebar heading; `sections` arrive in display order. */
+export interface NavSection {
+  key: string;
+  label: string;
+}
+
+export interface NavResponse {
+  items: NavItem[];
+  sections: NavSection[];
+}
+
+export type WidgetSize = 'kpi' | 'wide' | 'narrow';
+
+/** One dashboard card the user may see (GET /t/dashboard). */
+export interface DashboardWidget {
+  key: string;
+  title: string;
+  size: WidgetSize;
+  order: number;
 }
 
 export type ModuleGroup = 'core' | 'operations' | 'finance' | 'industry' | 'growth';

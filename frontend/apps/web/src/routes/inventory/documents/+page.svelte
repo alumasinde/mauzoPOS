@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import type { Branch } from '@mauzo/types';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
@@ -13,13 +15,21 @@
     transfers: 'Transfers',
     counts: 'Stocktakes',
   };
-  let tab = $state<Tab>('adjustments');
+  const TABS: Tab[] = ['adjustments', 'transfers', 'counts'];
+  // The tab lives in the URL so the sidebar's "Stock transfers" link lands on it.
+  const tab = $derived.by<Tab>(() => {
+    const t = page.url.searchParams.get('tab');
+    return TABS.includes(t as Tab) ? (t as Tab) : 'adjustments';
+  });
+  const switchTab = (t: Tab) =>
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only change on this page
+    goto(t === 'adjustments' ? '?' : `?tab=${t}`, { replace: true, reset: false });
   let branches = $state<Branch[]>([]);
   let reload = $state(0);
 
   onMount(async () => {
     try {
-      branches = await api.get<Branch[]>('/api/v1/t/branches');
+      branches = await api.get<Branch[]>('/api/v1/t/branches/accessible');
     } catch {
       /* picker optional */
     }
@@ -40,7 +50,7 @@
 {:else}
   <nav class="tabs">
     {#each ['adjustments', 'transfers', 'counts'] as t (t)}
-      <button class:active={tab === t} onclick={() => (tab = t as Tab)}>
+      <button class:active={tab === t} onclick={() => switchTab(t as Tab)}>
         {tabLabels[t as Tab] ?? t}
       </button>
     {/each}

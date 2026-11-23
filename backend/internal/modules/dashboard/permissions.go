@@ -1,5 +1,5 @@
-// Package dashboard will serve the configurable back-office dashboard
-// widgets. For now it owns the dashboard permission.
+// Package dashboard serves the back-office dashboard layout: the widgets the
+// current user may see, contributed by enabled modules (see Widgets).
 package dashboard
 
 import "mauzo/internal/core/authz"

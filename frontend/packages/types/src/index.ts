@@ -53,6 +53,8 @@ export interface Profile {
   name: string;
   identity: string;
   role: string;
+  /** Tenant role display name, e.g. "Administrator". */
+  role_name?: string;
   mfa_enabled: boolean;
   tenant?: TenantRef;
   /** Effective permissions (tenant users: module-gated). UI hint only — the API enforces. */

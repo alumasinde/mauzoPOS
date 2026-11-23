@@ -85,5 +85,6 @@ type ActiveRequest struct {
 
 // NavResponse is the dynamic sidebar.
 type NavResponse struct {
-	Items []modules.NavItem `json:"items"`
+	Items    []modules.NavItem    `json:"items"`
+	Sections []modules.NavSection `json:"sections"` // display order + headings
 }

@@ -36,6 +36,28 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, out)
 }
 
+// Accessible handles GET /t/branches/accessible: the active branches the
+// caller may work in, for the branch picker.
+func (h *Handler) Accessible(w http.ResponseWriter, r *http.Request) {
+	actor, ok := identity.ActorFrom(r.Context())
+	if !ok || actor.TenantID == 0 {
+		httpx.WriteError(w, r, httpx.ErrForbidden)
+		return
+	}
+	rows, err := h.svc.List(r.Context(), actor.TenantID)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	out := make([]Response, 0, len(rows))
+	for _, b := range rows {
+		if b.Status == StatusActive && actor.CanAccessBranch(b.ID) {
+			out = append(out, ToResponse(b))
+		}
+	}
+	httpx.OK(w, out)
+}
+
 // Create handles POST /t/branches.
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	actor, ok := identity.ActorFrom(r.Context())
