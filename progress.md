@@ -117,19 +117,19 @@ column is ✅ and docs are updated).
 
 | Feature | DB | API | UI | Tests | Status |
 |---|---|---|---|---|---|
-| Categories / departments (tree) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Brands | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Units of measure + conversions | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Products: standard, service, packaged | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Variable-weight products (price per kg) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Product variants | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Composite / deposit products | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Multiple barcodes per product (+ pack-size barcodes) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| `pkg/barcode`: EAN/UPC validation, weighted-barcode parsing rules | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Custom attributes | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Product images (storage interface) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Import / export (CSV/XLSX) | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Barcode label printing | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Categories / departments (tree) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Brands | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Units of measure + conversions | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Products: standard, service, packaged | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Variable-weight products (price per kg) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Product variants | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Composite / deposit products | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Multiple barcodes per product (+ pack-size barcodes) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `pkg/barcode`: EAN/UPC validation, weighted-barcode parsing rules | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Custom attributes | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Product images (storage interface) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Import / export (CSV/XLSX) | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Barcode label printing | ➖ | ✅ | ✅ | ✅ | ✅ |
 
 ## Phase 5 — Inventory & pricing
 
@@ -335,3 +335,5 @@ column is ✅ and docs are updated).
 | 2026-11-23 | Phase 2: migrations 00005–00007 (business_types/profiles, plans/tenant_subscriptions, tenant cols + tenant_settings + tenant_modules + branches + pos_terminals); `core/modules` catalogue, `core/settings` key/value store + JSON-schema validator; modules businesstypes (profile CRUD + idempotent apply engine), subscriptions (plan CRUD + assign/cancel + trial), settings (`/t/settings`), branches + terminals (minimal create/list), onboarding (8-step wizard state machine: business → profile → plan → modules → branch → admin → preferences → terminal → complete, guard: branch+terminal required); `ONBOARDING_TRIAL_DAYS` config; catalogue seed (7 business types + default profiles, 3 plans); platform UI (Business types, Plans); web UI (onboarding wizard `/onboarding`, `/settings`, dashboard banner). Integration test walks the whole wizard against `mauzo_test`. Verified live: full wizard run end-to-end on demo tenant. `golangci-lint` 0 issues, all tests green, frontend check/lint/build green. |
 | 2026-11-23 | Review fixes. **Auth:** MFA tickets revoked after `LOGIN_MAX_ATTEMPTS` bad codes and redeemable once (conditional `MarkMFAVerified`); password checked before account/tenant status; argon2 timing equaliser for unknown/PIN-only identities; lockout map pruned and bounded; reset tokens consumed atomically before the password change; reset mail goes to `Account.Email` only (username-only/PIN-only accounts skipped). **Users:** usernames may not contain `@`, emails must. **Tests:** `testutil` refuses a `TEST_DB_NAME` equal to `DB_NAME` or without "test". **Profiles:** `Apply` and profile save run in transactions, DB errors no longer reported as 404, `SetDefaults` no longer uses `INSERT IGNORE`. **DB:** migration 00008 composite FK `pos_terminals(tenant_id, branch_id) → branches(tenant_id, id)` (validated up/down on `mauzo_test`, applied to dev). Build + vet clean; tests not run (new `lockout_test.go` included). |
 | 2026-11-23 | Phase 3: module registry (`core/modules`: deps, config schemas, nav; `modules` + `tenant_modules.source`; effective = core ∪ enabled ∩ plan ∩ platform-active, dependency closure, cascade disable, plan downgrade hides). Permission metadata + `permissions` table synced at boot (guarded by `registerall`). Tenant roles + `role_permissions`, 7 templates that auto-follow until customised, locked owner, no-escalation everywhere. Employees CRUD with role, branch access (`user_branches`), PIN (argon2id), seat limit, last-owner/self guards, session revoke. `Can()` = module + permission, `RequireModule`, `BranchScope` (`X-Branch-Id`); `RequireUserRole` removed. `/me` returns permissions/modules; `GET /t/navigation`. Web: dynamic sidebar, Employees, Roles (permission picker), Modules (config forms); platform: Modules page + per-tenant overrides. Migrations 00009 (RBAC) + 00010 (Go backfill: system roles, `users.role` → `role_id`) validated up/down on `mauzo_test`, **not yet applied to dev**. Also fixed: 15 handlers ignoring JSON decode errors, onboarding admin-step role escalation, apps crashing on load (`auth.ts` used `$state` → `auth.svelte.ts`), lockout prune O(n²). ADR 0001. All Go tests pass; svelte-check/eslint/prettier clean. |
+
+| 2026-11-23 | Phase 4: `pkg/barcode` (EAN-8/13, UPC-A check digits, reserved-prefix weighted-label parsing, Code128 encoder for label sheets). Migration 00011: categories (parent tree), brands, units+conversions (kind, base, factor), products (kind/sell_by/track_stock/vat/deposit/attributes JSON), variants, product_barcodes (code+variant+pack_qty unique per tenant), components, images. `modules/catalog`: taxonomy CRUD; product CRUD in transactions with child-row replace; business rules enforced (services can't stock-track/weight-sell, weight→mass units only, composites need non-composite components, no self/cycles, tenant-scoped barcode uniqueness incl. variants/pack codes); lookup by barcode/SKU/weighted scale label; local image store (`STORAGE_LOCAL_PATH`) + upload/serve/delete; CSV+XLSX (excelize) import/export sharing one record pipeline — upsert by SKU, auto-create category/brand, per-row errors; label-sheet endpoint with Code128 patterns. Web: `/catalog` (list/search/filter/archive, import/export CSV+XLSX, label print), `/catalog/taxonomy`, `/catalog/labels`, reusable `ProductForm` + `RowSection`/`UnitsPanel`/`ProductActions`/`transfer.ts`; dynamic nav via module registry. Integration test covers taxonomy/products/weighted/variants/composite/pack barcodes/lookup/import-export/images; live-verified end-to-end on demo tenant. `golangci-lint` 0 issues, `go test ./...` green, svelte-check/eslint/prettier clean, `pnpm -r build` green. |
