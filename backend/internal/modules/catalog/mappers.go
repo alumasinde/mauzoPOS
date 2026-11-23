@@ -12,12 +12,12 @@ func ToCategoryResponse(c Category, pubs map[uint64]string) CategoryResponse {
 			parent = &pub
 		}
 	}
-	return CategoryResponse{ID: c.PublicID, ParentID: parent, Name: c.Name, Sort: c.Sort, CreatedAt: c.CreatedAt}
+	return CategoryResponse{ID: c.PublicID, ParentID: parent, Name: c.Name, Sort: c.Sort, ProductCount: c.ProductCount, CreatedAt: c.CreatedAt}
 }
 
 // ToBrandResponse maps a Brand to its API shape.
 func ToBrandResponse(b Brand) BrandResponse {
-	return BrandResponse{ID: b.PublicID, Name: b.Name}
+	return BrandResponse{ID: b.PublicID, Name: b.Name, ProductCount: b.ProductCount}
 }
 
 // ToUnitResponse maps a Unit to its API shape. bases maps id→code.
@@ -75,7 +75,7 @@ func ToProductDetail(p Product) ProductDetail {
 	}
 	imgs := make([]ImageResponse, len(p.Images))
 	for i, img := range p.Images {
-		imgs[i] = ImageResponse{ID: img.ID, URL: "/api/t/catalog/images/" + strconv.FormatUint(img.ID, 10), Sort: img.Sort}
+		imgs[i] = ImageResponse{ID: img.ID, URL: "/api/v1/t/catalog/images/" + strconv.FormatUint(img.ID, 10), Sort: img.Sort}
 	}
 	return ProductDetail{
 		ProductResponse: ToProductResponse(p, p.CategoryPublicID, p.BrandPublicID, p.UnitCode),
@@ -88,6 +88,15 @@ func ToListResponse(r ListRow) ProductResponse {
 	resp := ToProductResponse(r.Product, r.CategoryPublicID, r.BrandPublicID, r.UnitCode)
 	resp.CategoryName = r.CategoryName
 	resp.BrandName = r.BrandName
+	resp.LowStock = r.LowStock
+	if r.ImageID != nil {
+		u := "/api/v1/t/catalog/images/" + strconv.FormatUint(*r.ImageID, 10)
+		resp.ImageURL = &u
+	}
+	if r.Stock != nil {
+		s := r.Stock.String()
+		resp.Stock = &s
+	}
 	return resp
 }
 

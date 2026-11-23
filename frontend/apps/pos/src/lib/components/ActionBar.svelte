@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Icon } from '@mauzo/ui';
   import { cart } from '../cart.svelte';
   import { formatMoney } from '../money';
 
@@ -14,32 +15,32 @@
   } = $props();
 
   const methods: { key: Method; label: string; icon: string }[] = [
-    { key: 'cash', label: 'Cash', icon: '💵' },
-    { key: 'card', label: 'Card', icon: '💳' },
-    { key: 'bank', label: 'Bank', icon: '🏦' },
-    { key: 'credit', label: 'Credit', icon: '📒' },
+    { key: 'cash', label: 'Cash', icon: 'banknote' },
+    { key: 'card', label: 'Card', icon: 'credit-card' },
+    { key: 'bank', label: 'Bank', icon: 'landmark' },
+    { key: 'credit', label: 'Credit', icon: 'book' },
   ];
 </script>
 
 <footer class="bar">
   <div class="acts">
     <button class="act danger" onclick={() => onaction('cancel')}>
-      <span class="ic">✕</span><span>Cancel</span><small>Esc</small>
+      <span class="ic"><Icon name="x" size={20} /></span><span>Cancel</span><small>Esc</small>
     </button>
     <button class="act" onclick={() => onaction('hold')}>
-      <span class="ic">⏸</span><span>Hold Sale</span><small>F5</small>
+      <span class="ic"><Icon name="pause" size={20} /></span><span>Hold Sale</span><small>F5</small>
     </button>
     <button class="act" onclick={() => onaction('pricecheck')}>
-      <span class="ic">🏷</span><span>Price Check</span><small>F6</small>
+      <span class="ic"><Icon name="tag" size={20} /></span><span>Price Check</span><small>F6</small>
     </button>
     <button class="act" onclick={() => onaction('quantity')}>
-      <span class="ic">▦</span><span>Quantity</span><small>F7</small>
+      <span class="ic"><Icon name="grid" size={20} /></span><span>Quantity</span><small>F7</small>
     </button>
     <button class="act" onclick={() => onaction('discount')}>
-      <span class="ic">%</span><span>Discount</span><small>F8</small>
+      <span class="ic"><Icon name="percent" size={20} /></span><span>Discount</span><small>F8</small>
     </button>
     <button class="act" onclick={() => onaction('more')}>
-      <span class="ic">•••</span><span>More</span><small>▾</small>
+      <span class="ic"><Icon name="dots" size={20} /></span><span>More</span><small>▾</small>
     </button>
   </div>
 
@@ -48,12 +49,12 @@
     <div class="pmethods">
       {#each methods as m (m.key)}
         <button class="pm" class:on={method === m.key} onclick={() => (method = m.key)}>
-          <span class="pi">{m.icon}</span>{m.label}
+          <span class="pi"><Icon name={m.icon} size={22} /></span>{m.label}
         </button>
       {/each}
     </div>
     <button class="paynow" disabled={cart.count === 0} onclick={() => onaction('pay')}>
-      <span class="ck">✔</span>
+      <span class="ck"><Icon name="check" size={22} /></span>
       Pay {currency}
       {formatMoney(cart.totals.total)}
       <small>F10</small>
@@ -101,7 +102,7 @@
     background: var(--color-danger-hover);
   }
   .ic {
-    font-size: 1.2rem;
+    display: inline-flex;
   }
   .act small {
     font-size: 0.65rem;
@@ -159,7 +160,7 @@
     background: #5a6270;
   }
   .pi {
-    font-size: 1.3rem;
+    display: inline-flex;
   }
   .paynow {
     display: flex;
@@ -189,6 +190,6 @@
     opacity: 0.8;
   }
   .ck {
-    font-size: 1.4rem;
+    display: inline-flex;
   }
 </style>

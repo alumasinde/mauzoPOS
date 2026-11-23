@@ -1,5 +1,8 @@
 //go:build windows
 
+// The winspool calls below pass Go pointers to Win32 through syscall; each
+// pointer refers to memory that outlives the call (gosec G103 reviewed).
+
 package printing
 
 import (
@@ -48,6 +51,7 @@ func openPrinter(name string) (syscall.Handle, error) {
 		return 0, err
 	}
 	var h syscall.Handle
+	//nolint:gosec // G103: Win32 FFI, pointers valid for the call
 	r, _, e := procOpenPrinter.Call(uintptr(unsafe.Pointer(p)), uintptr(unsafe.Pointer(&h)), 0)
 	if r == 0 {
 		return 0, fmt.Errorf("open printer %q: %w", name, e)
@@ -74,6 +78,7 @@ func spoolRaw(printer, title string, job []byte) error {
 		return err
 	}
 	di := docInfo1{docName: name, datatype: raw}
+	//nolint:gosec // G103: Win32 FFI, pointers valid for the call
 	if r, _, e := procStartDoc.Call(uintptr(h), 1, uintptr(unsafe.Pointer(&di))); r == 0 {
 		return fmt.Errorf("start document: %w", e)
 	}
@@ -82,6 +87,7 @@ func spoolRaw(printer, title string, job []byte) error {
 		return fmt.Errorf("start page: %w", e)
 	}
 	var written uint32
+	//nolint:gosec // G103: Win32 FFI, pointers valid for the call
 	r, _, e := procWritePrinter.Call(uintptr(h), uintptr(unsafe.Pointer(&job[0])), uintptr(len(job)),
 		uintptr(unsafe.Pointer(&written)))
 	_, _, _ = procEndPage.Call(uintptr(h))
@@ -107,21 +113,23 @@ func probeSpooler(printer string) error {
 func listPrinters() ([]string, error) {
 	flags := uintptr(printerEnumLocal | printerEnumConnections)
 	var needed, returned uint32
+	// Win32 EnumPrinters requires out-pointer marshalling.
 	_, _, _ = procEnumPrinters.Call(flags, 0, 4, 0, 0,
-		uintptr(unsafe.Pointer(&needed)), uintptr(unsafe.Pointer(&returned)))
+		uintptr(unsafe.Pointer(&needed)), uintptr(unsafe.Pointer(&returned))) //nolint:gosec
 	if needed == 0 {
 		return []string{}, nil
 	}
 	buf := make([]byte, needed)
-	r, _, e := procEnumPrinters.Call(flags, 0, 4, uintptr(unsafe.Pointer(&buf[0])), uintptr(needed),
-		uintptr(unsafe.Pointer(&needed)), uintptr(unsafe.Pointer(&returned)))
+	r, _, e := procEnumPrinters.Call(flags, 0, 4,
+		uintptr(unsafe.Pointer(&buf[0])), uintptr(needed), //nolint:gosec
+		uintptr(unsafe.Pointer(&needed)), uintptr(unsafe.Pointer(&returned))) //nolint:gosec
 	if r == 0 {
 		return nil, fmt.Errorf("list printers: %w", e)
 	}
 	out := make([]string, 0, returned)
 	size := unsafe.Sizeof(printerInfo4{})
 	for i := range uintptr(returned) {
-		pi := (*printerInfo4)(unsafe.Pointer(&buf[i*size]))
+		pi := (*printerInfo4)(unsafe.Pointer(&buf[i*size])) //nolint:gosec // safe: buf sized by EnumPrinters
 		if pi.printerName != nil {
 			out = append(out, utf16PtrToString(pi.printerName))
 		}
@@ -131,8 +139,8 @@ func listPrinters() ([]string, error) {
 
 func utf16PtrToString(p *uint16) string {
 	n := 0
-	for ptr := unsafe.Pointer(p); *(*uint16)(ptr) != 0; n++ {
-		ptr = unsafe.Add(ptr, 2)
+	for ptr := unsafe.Pointer(p); *(*uint16)(ptr) != 0; n++ { //nolint:gosec // walks a NUL-terminated Win32 string
+		ptr = unsafe.Add(ptr, 2) //nolint:gosec // byte advance matches UTF-16 units
 	}
-	return syscall.UTF16ToString(unsafe.Slice(p, n))
+	return syscall.UTF16ToString(unsafe.Slice(p, n)) //nolint:gosec // n counted from the same buffer
 }

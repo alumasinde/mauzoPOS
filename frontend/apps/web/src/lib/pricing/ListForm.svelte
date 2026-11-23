@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ApiError } from '@mauzo/api-client';
   import type { Branch, PriceList, Product } from '@mauzo/types';
-  import { Button, Modal, TextField, toast } from '@mauzo/ui';
+  import { Button, Modal, TextField, toast, Icon } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
 
   interface Item {
@@ -128,7 +128,9 @@
         </select>
         <input type="number" min="0" step="any" placeholder="Min qty" bind:value={it.min_qty} />
         <input type="number" min="0" step="any" placeholder="Price" bind:value={it.price} />
-        <Button variant="ghost" size="sm" onclick={() => (items = items.filter((_, j) => j !== i))}>✕</Button>
+        <Button variant="ghost" size="sm" onclick={() => (items = items.filter((_, j) => j !== i))}>
+          <Icon name="x" size={13} />
+        </Button>
       </div>
     {/each}
     <Button

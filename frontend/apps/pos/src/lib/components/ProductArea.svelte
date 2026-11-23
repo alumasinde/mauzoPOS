@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { Icon } from '@mauzo/ui';
   import { cart } from '../cart.svelte';
   import { desktop, type Category, type POSLayout, type Product } from '../desktop';
   import { formatMoney } from '../money';
@@ -18,7 +19,18 @@
   let searching = $state(false);
   let searchEl: HTMLInputElement | null = $state(null);
 
-  const TILE_ICONS = ['🛒', '🧺', '🥤', '🥛', '🧴', '🍿', '🧼', '🥩', '🍞', '🧃'];
+  const TILE_ICONS = [
+    'cart',
+    'basket',
+    'cup',
+    'bottle',
+    'spray',
+    'gift',
+    'sparkle',
+    'drumstick',
+    'loaf',
+    'bottle',
+  ];
 
   async function loadCategories() {
     if (!bridge) return;
@@ -75,7 +87,7 @@
 
 <section class="area">
   <div class="search">
-    <span class="bc">▌▍▌▌</span>
+    <span class="bc"><Icon name="barcode" size={22} /></span>
     <input
       bind:this={searchEl}
       bind:value={query}
@@ -83,21 +95,21 @@
       placeholder="Scan barcode or search product…"
       aria-label="Scan or search"
     />
-    <button class="find" onclick={search} aria-label="Search">🔍</button>
+    <button class="find" onclick={search} aria-label="Search"><Icon name="search" size={20} /></button>
   </div>
 
   <div class="tiles">
     {#if layout?.tables_first}
       <button class="tile tables" onclick={() => window.dispatchEvent(new CustomEvent('pos:held'))}>
-        <span class="ti">🍽</span><span class="tn">Tables</span>
+        <span class="ti"><Icon name="utensils" size={24} /></span><span class="tn">Tables</span>
       </button>
     {/if}
     <button class="tile" class:on={active === 0} onclick={() => pick(null)}>
-      <span class="ti">🛒</span><span class="tn">All Products</span>
+      <span class="ti"><Icon name="cart" size={24} /></span><span class="tn">All Products</span>
     </button>
     {#each categories as c, i (c.id)}
       <button class="tile" class:on={active === c.id} onclick={() => pick(c.id)}>
-        <span class="ti">{TILE_ICONS[i % TILE_ICONS.length]}</span>
+        <span class="ti"><Icon name={TILE_ICONS[i % TILE_ICONS.length] ?? 'tag'} size={24} /></span>
         <span class="tn">{c.name}</span>
         <span class="tc">{c.count}</span>
       </button>
@@ -108,7 +120,9 @@
     {#each products as p (p.variant_id ? `v${p.variant_id}` : p.id)}
       <button class="prod" onclick={() => cart.addProduct(p)}>
         <span class="img">
-          {p.name[0]}{#if layout?.weighted_items && p.sell_by === 'weight'}<i class="kg">⚖</i>{/if}
+          {p.name[0]}{#if layout?.weighted_items && p.sell_by === 'weight'}<i class="kg">
+              <Icon name="scale" size={12} />
+            </i>{/if}
         </span>
         <span class="pn">
           {p.name}{#if p.variant_name}
@@ -143,8 +157,7 @@
     height: 48px;
   }
   .bc {
-    font-size: 1.4rem;
-    letter-spacing: -1px;
+    display: inline-flex;
     color: var(--color-text-muted);
   }
   input {
@@ -199,7 +212,7 @@
     padding: 1px 3px;
   }
   .ti {
-    font-size: 1.5rem;
+    display: inline-flex;
   }
   .tn {
     font-size: var(--text-sm);

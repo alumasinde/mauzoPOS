@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { LoginHistoryEntry, MFAEnabled, MFASetup, SessionInfo } from '@mauzo/types';
-  import { Button, DataTable, MfaPanel, StatusDot, toast } from '@mauzo/ui';
+  import { Button, DataTable, MfaPanel, StatusDot, toast, PageHeader } from '@mauzo/ui';
   import { formatDate, formatTime } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
   import { auth, AUTH_BASE } from '#lib/auth.svelte.ts';
@@ -70,10 +70,11 @@
   onMount(load);
 </script>
 
-<section class="head">
-  <h1>Account</h1>
-  <p class="muted">{auth.user?.name} · {auth.user?.role.replace('_', ' ')} · {auth.user?.identity}</p>
-</section>
+<PageHeader
+  title="Account"
+  sub="{auth.user?.name} · {auth.user?.role.replace('_', ' ')} · {auth.user?.identity}"
+  icon="user"
+/>
 
 <div class="stack">
   <section class="card">
@@ -131,13 +132,6 @@
 </div>
 
 <style>
-  .head h1 {
-    margin: 0 0 var(--space-1);
-  }
-  .muted {
-    color: var(--color-text-muted);
-    margin: 0;
-  }
   .stack {
     display: flex;
     flex-direction: column;

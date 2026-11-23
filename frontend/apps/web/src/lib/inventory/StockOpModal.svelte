@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ApiError } from '@mauzo/api-client';
   import type { Branch, Product, StockLineRequest, StockLocation } from '@mauzo/types';
-  import { Button, Modal, toast } from '@mauzo/ui';
+  import { Button, Modal, toast, Icon } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
 
   interface Props {
@@ -150,7 +150,7 @@
           <option value="">Default location</option>
           {#each locations as loc (loc.id)}<option value={loc.id}>{loc.name}</option>{/each}
         </select>
-        <Button variant="ghost" size="sm" onclick={() => removeLine(i)}>✕</Button>
+        <Button variant="ghost" size="sm" onclick={() => removeLine(i)}><Icon name="x" size={13} /></Button>
       </div>
     {/each}
     <Button variant="ghost" size="sm" onclick={addLine}>+ Add line</Button>

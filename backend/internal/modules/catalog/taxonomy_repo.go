@@ -22,7 +22,9 @@ const catCols = `id, tenant_id, public_id, parent_id, name, sort, created_at`
 func (r *TaxonomyRepo) ListCategories(ctx context.Context, tenantID uint64) ([]Category, error) {
 	var out []Category
 	err := r.db.SelectContext(ctx, &out,
-		`SELECT `+catCols+` FROM categories WHERE tenant_id = ? ORDER BY parent_id IS NOT NULL, parent_id, sort, name`,
+		`SELECT `+catCols+`,
+			(SELECT COUNT(*) FROM products p WHERE p.category_id = categories.id) AS product_count
+		 FROM categories WHERE tenant_id = ? ORDER BY parent_id IS NOT NULL, parent_id, sort, name`,
 		tenantID)
 	return out, err
 }
@@ -98,7 +100,9 @@ const brandCols = `id, tenant_id, public_id, name, created_at`
 func (r *TaxonomyRepo) ListBrands(ctx context.Context, tenantID uint64) ([]Brand, error) {
 	var out []Brand
 	err := r.db.SelectContext(ctx, &out,
-		`SELECT `+brandCols+` FROM brands WHERE tenant_id = ? ORDER BY name`, tenantID)
+		`SELECT `+brandCols+`,
+			(SELECT COUNT(*) FROM products p WHERE p.brand_id = brands.id) AS product_count
+		 FROM brands WHERE tenant_id = ? ORDER BY name`, tenantID)
 	return out, err
 }
 

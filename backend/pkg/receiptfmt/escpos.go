@@ -47,7 +47,7 @@ func EncodeESCPOS(o Output, opt PrintOptions) []byte {
 			b.WriteByte(lf)
 			setStyle(&b, false, "")
 		case LineFeed:
-			b.Write([]byte{esc, 'd', byte(clamp(l.N, 1, 10))})
+			b.Write([]byte{esc, 'd', clampByte(l.N, 1, 10)})
 		case LineLogo:
 			if opt.Logo != nil && opt.Logo.Width > 0 {
 				setAlign(&b, or(l.Align, "center"))
@@ -68,7 +68,7 @@ func EncodeESCPOS(o Output, opt PrintOptions) []byte {
 		if n <= 0 {
 			n = 4
 		}
-		b.Write([]byte{esc, 'd', byte(clamp(n, 1, 10))})
+		b.Write([]byte{esc, 'd', clampByte(n, 1, 10)})
 		b.Write([]byte{gs, 'V', 66, 0}) // feed to cut position, partial cut
 	}
 	return b.Bytes()
@@ -110,12 +110,12 @@ func writeQR(b *bytes.Buffer, data string, size int) {
 		d = d[:700]
 	}
 	fn := func(params ...byte) {
-		n := len(params) + 1 // pL/pH count cn plus fn and its parameters (params[0] is fn)
-		b.Write([]byte{gs, '(', 'k', byte(n % 256), byte(n / 256), 49})
+		n := len(params) + 1                                            // pL/pH count cn plus fn and its parameters (params[0] is fn)
+		b.Write([]byte{gs, '(', 'k', byte(n % 256), byte(n / 256), 49}) //nolint:gosec // length is masked to a byte
 		b.Write(params)
 	}
 	fn(65, 50, 0)                         // model 2
-	fn(67, byte(clamp(size, 1, 16)))      // module size
+	fn(67, clampByte(size, 1, 16))        // module size
 	fn(69, 49)                            // error correction M
 	store := append([]byte{80, 48}, d...) // store data
 	fn(store...)
@@ -132,7 +132,7 @@ func writeCode128(b *bytes.Buffer, data string) {
 	b.Write([]byte{gs, 'w', 2})  // module width
 	b.Write([]byte{gs, 'H', 2})  // human-readable text below
 	payload := append([]byte("{B"), d...)
-	b.Write([]byte{gs, 'k', 73, byte(len(payload))})
+	b.Write([]byte{gs, 'k', 73, byte(len(payload))}) //nolint:gosec // payload ≤ 64 bytes by construction
 	b.Write(payload)
 	b.WriteByte(lf)
 }
@@ -140,9 +140,15 @@ func writeCode128(b *bytes.Buffer, data string) {
 // writeRaster prints a 1-bit image with GS v 0.
 func writeRaster(b *bytes.Buffer, r Raster) {
 	bpr := r.BytesPerRow()
-	b.Write([]byte{gs, 'v', '0', 0, byte(bpr % 256), byte(bpr / 256), byte(r.Height % 256), byte(r.Height / 256)})
+	// ESC/POS little-endian byte pairs; values are masked.
+	b.Write([]byte{gs, 'v', '0', 0, byte(bpr % 256), byte(bpr / 256), byte(r.Height % 256), byte(r.Height / 256)}) //nolint:gosec
 	b.Write(r.Bits)
 	b.WriteByte(lf)
+}
+
+// clampByte bounds n to [lo, hi] (both ≤ 255) and returns it as a byte.
+func clampByte(n, lo, hi int) byte {
+	return byte(clamp(n, lo, hi)) //nolint:gosec // bounded to 0–255 by clamp
 }
 
 func clamp(n, lo, hi int) int {

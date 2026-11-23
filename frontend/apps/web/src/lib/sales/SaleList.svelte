@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { Branch, Sale, SaleSummary } from '@mauzo/types';
-  import { Badge, Button, DataTable, Pager, toast } from '@mauzo/ui';
+  import { Badge, Button, DataTable, PageHeader, Pager, Select, StatCard, TextField, toast } from '@mauzo/ui';
   import { formatDate, formatMoney } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
   import SaleDetail from '#lib/sales/SaleDetail.svelte';
@@ -10,11 +10,19 @@
   interface Props {
     title?: string;
     subtitle?: string;
+    icon?: string;
     showKpis?: boolean;
     defaultFrom?: string;
     defaultTo?: string;
   }
-  let { title = 'Transactions', subtitle = '', showKpis = true, defaultFrom, defaultTo }: Props = $props();
+  let {
+    title = 'Transactions',
+    subtitle = '',
+    icon = 'receipt',
+    showKpis = true,
+    defaultFrom,
+    defaultTo,
+  }: Props = $props();
 
   const PER_PAGE = 25;
   let rows = $state<Sale[]>([]);
@@ -107,45 +115,42 @@
   });
 </script>
 
-<div class="head">
-  <div>
-    <h1>{title}</h1>
-    <p class="sub">{subtitle}</p>
+<PageHeader {title} sub={subtitle} {icon} />
+
+{#if summary && showKpis}
+  <div class="stats">
+    <StatCard icon="banknote" label="Total" value={formatMoney(summary.total)} />
+    <StatCard icon="receipt" label="Transactions" value={String(summary.cnt)} tone="teal" />
+    <StatCard icon="chart" label="Average sale" value={formatMoney(summary.avg)} tone="purple" />
   </div>
-  {#if summary && showKpis}
-    <div class="kpis">
-      <div class="kpi"><span>Total</span><strong>{formatMoney(summary.total)}</strong></div>
-      <div class="kpi"><span>Count</span><strong>{summary.cnt}</strong></div>
-      <div class="kpi"><span>Average</span><strong>{formatMoney(summary.avg)}</strong></div>
-    </div>
-  {/if}
-</div>
+{/if}
 
 <div class="filters">
-  <input
-    class="search"
-    placeholder="Receipt no, customer or item…"
-    bind:value={search}
-    onkeydown={(e) => e.key === 'Enter' && reload()}
-  />
-  <select bind:value={status} onchange={reload}>
+  <div class="search">
+    <TextField
+      placeholder="Receipt no, customer or item…"
+      bind:value={search}
+      onkeydown={(e) => e.key === 'Enter' && reload()}
+    />
+  </div>
+  <Select aria-label="Status" bind:value={status} onchange={reload}>
     <option value="">All statuses</option>
     <option value="completed">Completed</option>
     <option value="partially_returned">Partially returned</option>
     <option value="returned">Returned</option>
     <option value="voided">Voided</option>
-  </select>
-  <select bind:value={method} onchange={reload}>
+  </Select>
+  <Select aria-label="Method" bind:value={method} onchange={reload}>
     <option value="">All methods</option>
     <option value="cash">Cash</option>
     <option value="card">Card</option>
     <option value="bank">Bank transfer</option>
     <option value="credit">Credit</option>
-  </select>
-  <select bind:value={branchId} onchange={reload}>
+  </Select>
+  <Select aria-label="Branch" bind:value={branchId} onchange={reload}>
     <option value="">All branches</option>
     {#each branches as b (b.id)}<option value={b.id}>{b.name}</option>{/each}
-  </select>
+  </Select>
   <input type="date" bind:value={from} onchange={reload} />
   <input type="date" bind:value={to} onchange={reload} />
   <Button variant="secondary" onclick={reload}>Apply</Button>
@@ -186,37 +191,11 @@
 <SaleDetail bind:open={detailOpen} saleId={detailId} onchanged={load} />
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
     margin-bottom: 16px;
-  }
-  h1 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0;
-  }
-  .sub {
-    color: var(--ink-3, #8a93a6);
-    font-size: 13px;
-    margin: 4px 0 0;
-  }
-  .kpis {
-    display: flex;
-    gap: 20px;
-  }
-  .kpi {
-    text-align: right;
-  }
-  .kpi span {
-    display: block;
-    font-size: 11px;
-    color: var(--ink-3, #8a93a6);
-    text-transform: uppercase;
-  }
-  .kpi strong {
-    font-size: 17px;
   }
   .filters {
     display: flex;
@@ -224,8 +203,7 @@
     margin-bottom: 14px;
     flex-wrap: wrap;
   }
-  .filters input,
-  .filters select {
+  .filters input {
     padding: 8px 10px;
     border: 1px solid var(--line, #e3e7ee);
     border-radius: 8px;
@@ -235,6 +213,7 @@
   .search {
     flex: 1;
     min-width: 220px;
+    max-width: 340px;
   }
   .num {
     text-align: right;

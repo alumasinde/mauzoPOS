@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { Branch, PriceList } from '@mauzo/types';
-  import { Badge, Button, DataTable, toast } from '@mauzo/ui';
+  import { Badge, Button, DataTable, toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import ListForm from '#lib/pricing/ListForm.svelte';
@@ -79,22 +79,20 @@
   });
 </script>
 
-<div class="head">
-  <div>
-    <h1>Price lists</h1>
-    <p class="muted">Branch and customer-group pricing with quantity tiers.</p>
-  </div>
-  {#if canEdit}
-    <Button
-      onclick={() => {
-        target = null;
-        open = true;
-      }}
-    >
-      New price list
-    </Button>
-  {/if}
-</div>
+<PageHeader title="Price lists" sub="Branch and customer-group pricing with quantity tiers." icon="tag">
+  {#snippet actions()}
+    {#if canEdit}
+      <Button
+        onclick={() => {
+          target = null;
+          open = true;
+        }}
+      >
+        New price list
+      </Button>
+    {/if}
+  {/snippet}
+</PageHeader>
 
 <DataTable
   {columns}
@@ -122,17 +120,4 @@
 <ListForm {branches} {target} bind:open ondone={load} onclose={() => (open = false)} />
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 14px;
-  }
-  .muted {
-    color: var(--fg-muted, #666);
-    margin: 4px 0 0;
-  }
-  h1 {
-    margin: 0;
-  }
 </style>

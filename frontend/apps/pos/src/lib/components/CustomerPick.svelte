@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Icon } from '@mauzo/ui';
   // Customer picker — search synced accounts and attach one to the cart
   // (required for credit sales, optional otherwise).
   import { desktop, type Customer } from '../desktop';
@@ -35,7 +36,9 @@
   {#if cart.customerID}
     <span class="cpick">
       Customer: <b>{cart.customerName}</b>
-      <button class="x" onclick={() => cart.setCustomer('', '')} aria-label="Clear">✕</button>
+      <button class="x" onclick={() => cart.setCustomer('', '')} aria-label="Clear">
+        <Icon name="x" size={13} />
+      </button>
     </span>
   {:else}
     <div class="pcRow">

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { Promotion } from '@mauzo/types';
-  import { Badge, Button, DataTable, toast } from '@mauzo/ui';
+  import { Badge, Button, DataTable, toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import PromoForm from '#lib/pricing/PromoForm.svelte';
@@ -62,22 +62,24 @@
   onMount(load);
 </script>
 
-<div class="head">
-  <div>
-    <h1>Promotions</h1>
-    <p class="muted">Percent, amount and buy-X-get-Y discounts with windows and targets.</p>
-  </div>
-  {#if canManage}
-    <Button
-      onclick={() => {
-        target = null;
-        open = true;
-      }}
-    >
-      New promotion
-    </Button>
-  {/if}
-</div>
+<PageHeader
+  title="Promotions"
+  sub="Percent, amount and buy-X-get-Y discounts with windows and targets."
+  icon="percent"
+>
+  {#snippet actions()}
+    {#if canManage}
+      <Button
+        onclick={() => {
+          target = null;
+          open = true;
+        }}
+      >
+        New promotion
+      </Button>
+    {/if}
+  {/snippet}
+</PageHeader>
 
 <DataTable {columns} {rows} rowKey={(r) => r.id} {loading} empty="No promotions yet.">
   {#snippet cell(row, col)}
@@ -110,17 +112,4 @@
 <PromoForm {target} bind:open ondone={load} onclose={() => (open = false)} />
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 14px;
-  }
-  .muted {
-    color: var(--fg-muted, #666);
-    margin: 4px 0 0;
-  }
-  h1 {
-    margin: 0;
-  }
 </style>

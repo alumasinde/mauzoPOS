@@ -49,6 +49,8 @@ type Category struct {
 	Name      string    `db:"name"`
 	Sort      int       `db:"sort"`
 	CreatedAt time.Time `db:"created_at"`
+	// ProductCount is populated by ListCategories only.
+	ProductCount int `db:"product_count"`
 }
 
 // Brand is a flat product brand label.
@@ -58,6 +60,8 @@ type Brand struct {
 	PublicID  string    `db:"public_id"`
 	Name      string    `db:"name"`
 	CreatedAt time.Time `db:"created_at"`
+	// ProductCount is populated by ListBrands only.
+	ProductCount int `db:"product_count"`
 }
 
 // Unit is a unit of measure. TenantID nil marks a shared built-in.

@@ -28,17 +28,22 @@ const prodCols = `id, tenant_id, public_id, sku, name, description, kind,
 type ListFilter struct {
 	Query      string
 	CategoryID uint64 // public-id resolved by the service
+	BrandID    uint64 // public-id resolved by the handler
+	Kind       string
 	Status     string
 }
 
 // ListRow is a product plus its resolved taxonomy names for list display.
 type ListRow struct {
 	Product
-	CategoryPublicID *string `db:"category_public_id"`
-	CategoryName     *string `db:"category_name"`
-	BrandPublicID    *string `db:"brand_public_id"`
-	BrandName        *string `db:"brand_name"`
-	UnitCode         *string `db:"unit_code"`
+	CategoryPublicID *string          `db:"category_public_id"`
+	CategoryName     *string          `db:"category_name"`
+	BrandPublicID    *string          `db:"brand_public_id"`
+	BrandName        *string          `db:"brand_name"`
+	UnitCode         *string          `db:"unit_code"`
+	ImageID          *uint64          `db:"image_id"`
+	Stock            *decimal.Decimal `db:"stock"`
+	LowStock         bool             `db:"low_stock"`
 }
 
 // List returns a page of products matching f with taxonomy names resolved.
@@ -52,6 +57,14 @@ func (r *ProductRepo) List(ctx context.Context, tenantID uint64, f ListFilter, p
 	if f.CategoryID != 0 {
 		where += ` AND p.category_id = ?`
 		args = append(args, f.CategoryID)
+	}
+	if f.BrandID != 0 {
+		where += ` AND p.brand_id = ?`
+		args = append(args, f.BrandID)
+	}
+	if f.Kind != "" {
+		where += ` AND p.kind = ?`
+		args = append(args, f.Kind)
 	}
 	if f.Status != "" {
 		where += ` AND p.status = ?`
@@ -67,7 +80,20 @@ func (r *ProductRepo) List(ctx context.Context, tenantID uint64, f ListFilter, p
 		`SELECT p.`+strings.ReplaceAll(prodCols, ", ", ", p.")+`,
 				c.public_id AS category_public_id, c.name AS category_name,
 				b.public_id AS brand_public_id, b.name AS brand_name,
-				u.code AS unit_code
+				u.code AS unit_code,
+				(SELECT i.id FROM product_images i WHERE i.product_id = p.id
+				 ORDER BY i.sort, i.id LIMIT 1) AS image_id,
+				CASE WHEN p.track_stock = 1 THEN
+					(SELECT COALESCE(SUM(sb.qty),0) FROM stock_balances sb
+					 WHERE sb.tenant_id = p.tenant_id AND sb.product_id = p.id)
+				END AS stock,
+				EXISTS (
+					SELECT 1 FROM reorder_levels rl
+					WHERE rl.tenant_id = p.tenant_id AND rl.product_id = p.id AND rl.min_qty > 0
+					  AND rl.min_qty > COALESCE((SELECT SUM(sb.qty) FROM stock_balances sb
+						WHERE sb.tenant_id = rl.tenant_id AND sb.branch_id = rl.branch_id
+						  AND sb.product_id = rl.product_id AND sb.variant_id = rl.variant_id), 0)
+				) AS low_stock
 		 FROM products p
 		 LEFT JOIN categories c ON c.id = p.category_id
 		 LEFT JOIN brands b ON b.id = p.brand_id

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { Branch, Employee, Ref } from '@mauzo/types';
-  import { Badge, Button, DataTable, Pager, StatusDot, TextField, toast } from '@mauzo/ui';
+  import { Badge, Button, DataTable, Pager, StatusDot, TextField, toast, PageHeader } from '@mauzo/ui';
   import { formatDate } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
@@ -94,12 +94,8 @@
   });
 </script>
 
-<section class="head">
-  <div>
-    <h1>Employees</h1>
-    <p class="muted">{total} employees</p>
-  </div>
-  <div class="tools">
+<PageHeader title="Employees" sub="{total} employees" icon="id-badge">
+  {#snippet actions()}
     <TextField
       placeholder="Search name, email, username…"
       bind:value={q}
@@ -123,8 +119,8 @@
     {#if auth.can('users.employee.create') && roles.length > 0}
       <Button onclick={() => edit(null)}>Add employee</Button>
     {/if}
-  </div>
-</section>
+  {/snippet}
+</PageHeader>
 
 <DataTable {columns} {rows} rowKey={(r) => r.id} {loading} empty="No employees match.">
   {#snippet cell(row: Employee, col)}
@@ -196,23 +192,6 @@
 <SecretModal bind:open={secretOpen} employee={target} kind={secretKind} onsaved={load} />
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
-    flex-wrap: wrap;
-  }
-  .head h1 {
-    margin: 0 0 var(--space-1);
-  }
-  .tools {
-    display: flex;
-    gap: var(--space-3);
-    align-items: center;
-    flex-wrap: wrap;
-  }
   select {
     min-height: 40px;
     padding: var(--space-2) var(--space-3);

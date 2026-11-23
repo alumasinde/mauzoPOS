@@ -71,8 +71,6 @@ func setup(t *testing.T) fixture {
 	must(t, err)
 	var roleID uint64
 	must(t, conn.GetContext(ctx, &roleID, `SELECT id FROM roles WHERE tenant_id = ?`, tenantID))
-	_, err = conn.ExecContext(ctx, `INSERT INTO role_permissions (role_id, permission) VALUES (?, 'pos.sale.create')`, roleID)
-	must(t, err)
 	userPub := security.NewPublicID()
 	_, err = conn.ExecContext(ctx, `INSERT INTO users (tenant_id, public_id, name, username, role_id, all_branches, status)
 		VALUES (?, ?, 'Mary', 'mary', ?, 1, 'active')`, tenantID, userPub, roleID)

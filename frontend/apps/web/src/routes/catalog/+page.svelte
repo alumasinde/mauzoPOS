@@ -3,13 +3,15 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { ApiError } from '@mauzo/api-client';
-  import type { Brand, Category, Product, ProductDetail, Unit } from '@mauzo/types';
-  import { Badge, Button, DataTable, Pager, TextField, toast } from '@mauzo/ui';
+  import type { Brand, CatalogOverview, Category, Product, ProductDetail, Unit } from '@mauzo/types';
+  import { Button, Icon, Pager, PageHeader, Select, TextField, toast } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import ProductForm from '#lib/catalog/ProductForm.svelte';
-  import ProductActions from '#lib/catalog/ProductActions.svelte';
-  import { exportProducts, importProducts } from '#lib/catalog/transfer.ts';
+  import ProductsTable from '#lib/catalog/ProductsTable.svelte';
+  import CatalogStats from '#lib/catalog/CatalogStats.svelte';
+  import { importProducts } from '#lib/catalog/transfer.ts';
+  import TransferMenu from '#lib/catalog/TransferMenu.svelte';
 
   const PER_PAGE = 25;
   let rows = $state<Product[]>([]);
@@ -17,10 +19,13 @@
   let brands = $state<Brand[]>([]);
   let units = $state<Unit[]>([]);
   let allProducts = $state<{ id: string; sku: string; name: string }[]>([]);
+  let stats = $state<CatalogOverview | null>(null);
   let loading = $state(true);
   let q = $state('');
   let categoryId = $state('');
-  let showArchived = $state(false);
+  let brandId = $state('');
+  let kind = $state('');
+  let status = $state<'active' | 'archived' | 'all'>('active');
   let pageNum = $state(1);
   let total = $state(0);
 
@@ -32,15 +37,12 @@
   const canManage = $derived(auth.can('catalog.product.create'));
   const canDelete = $derived(auth.can('catalog.product.delete'));
 
-  const columns = [
-    { key: 'sku', label: 'SKU', width: '110px' },
-    { key: 'name', label: 'Product' },
-    { key: 'category_name', label: 'Category', width: '130px' },
-    { key: 'kind', label: 'Kind', width: '90px' },
-    { key: 'sell', label: 'Sell', width: '80px' },
-    { key: 'price', label: 'Price', width: '90px', align: 'right' as const },
-    { key: 'actions', label: '', width: '220px', align: 'right' as const },
-  ];
+  const KINDS = [
+    { v: 'standard', l: 'Standard' },
+    { v: 'service', l: 'Service' },
+    { v: 'packaged', l: 'Packaged' },
+    { v: 'composite', l: 'Composite' },
+  ] as const;
 
   async function load() {
     loading = true;
@@ -50,7 +52,9 @@
         per_page: PER_PAGE,
         q,
         category_id: categoryId,
-        status: showArchived ? 'archived' : 'active',
+        brand_id: brandId,
+        kind,
+        status,
       });
       rows = res.data;
       total = res.meta.total;
@@ -58,6 +62,14 @@
       toast.error(e instanceof ApiError ? e.message : 'Failed to load products');
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadStats() {
+    try {
+      stats = await api.get<CatalogOverview>('/api/v1/t/catalog/overview');
+    } catch {
+      stats = null; // cards are supplementary; the table is the real work
     }
   }
 
@@ -76,6 +88,11 @@
     } catch {
       /* lookups are best-effort */
     }
+  }
+
+  function refilter() {
+    pageNum = 1;
+    load();
   }
 
   async function edit(p: Product | null) {
@@ -102,6 +119,7 @@
       await api.del(`/api/v1/t/catalog/products/${p.id}`);
       toast.success('Product archived');
       load();
+      loadStats();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Archive failed');
     } finally {
@@ -122,6 +140,7 @@
       toast.success(`Imported: ${report.created} created, ${report.updated} updated`);
       for (const err of report.errors.slice(0, 5)) toast.error(`Row ${err.row}: ${err.message}`);
       load();
+      loadStats();
       loadLookups();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Import failed');
@@ -130,13 +149,6 @@
     }
   }
 
-  async function doExport(format: 'csv' | 'xlsx' = 'csv') {
-    try {
-      await exportProducts(format);
-    } catch {
-      toast.error('Export failed');
-    }
-  }
 
   function printLabels() {
     const ids = rows
@@ -148,79 +160,49 @@
 
   onMount(() => {
     load();
+    loadStats();
     loadLookups();
   });
 </script>
 
 <svelte:head><title>Products — Mauzo</title></svelte:head>
 
-<div class="head">
-  <div>
-    <h1>Products</h1>
-    <p class="sub">{total} products</p>
-  </div>
-  <div class="actions">
+<PageHeader title="Products" sub="Manage your catalogue, pricing and product availability" icon="box">
+  {#snippet actions()}
     {#if canManage}
-      <Button variant="ghost" onclick={() => doExport('csv')}>Export CSV</Button>
-      <Button variant="ghost" onclick={() => doExport('xlsx')}>Export XLSX</Button>
-      <Button variant="ghost" onclick={() => importInput?.click()}>Import</Button>
+      <Button onclick={() => edit(null)}><Icon name="plus" size={16} /> Add product</Button>
+      <TransferMenu onimport={() => importInput?.click()} onlabels={printLabels} />
       <input bind:this={importInput} type="file" accept=".csv,.xlsx" hidden onchange={doImport} />
-      <Button variant="ghost" onclick={printLabels}>Print labels</Button>
-      <Button onclick={() => edit(null)}>+ New product</Button>
     {/if}
-  </div>
-</div>
+  {/snippet}
+</PageHeader>
+
+{#if stats}<CatalogStats {stats} />{/if}
 
 <div class="filters">
   <div class="q">
-    <TextField
-      placeholder="Search name or SKU…"
-      bind:value={q}
-      oninput={() => {
-        pageNum = 1;
-        load();
-      }}
-    />
+    <TextField placeholder="Search by name, SKU or barcode…" bind:value={q} oninput={refilter} />
   </div>
-  <select
-    bind:value={categoryId}
-    onchange={() => {
-      pageNum = 1;
-      load();
-    }}
-  >
-    <option value="">All categories</option>
+  <Select aria-label="Category" bind:value={categoryId} onchange={refilter}>
+    <option value="">All Categories</option>
     {#each categories as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
-  </select>
-  <label class="chk">
-    <input type="checkbox" bind:checked={showArchived} onchange={load} /> Show archived
-  </label>
+  </Select>
+  <Select aria-label="Brand" bind:value={brandId} onchange={refilter}>
+    <option value="">All Brands</option>
+    {#each brands as b (b.id)}<option value={b.id}>{b.name}</option>{/each}
+  </Select>
+  <Select aria-label="Type" bind:value={kind} onchange={refilter}>
+    <option value="">All Types</option>
+    {#each KINDS as k (k.v)}<option value={k.v}>{k.l}</option>{/each}
+  </Select>
+  <Select aria-label="Status" bind:value={status} onchange={refilter}>
+    <option value="active">Active</option>
+    <option value="archived">Archived</option>
+    <option value="all">All Statuses</option>
+  </Select>
 </div>
 
-<DataTable
-  {columns}
-  {rows}
-  rowKey={(r) => r.id}
-  {loading}
-  empty="No products yet — import a CSV or create one."
-  onrowclick={canManage ? edit : undefined}
->
-  {#snippet cell(row, col)}
-    {#if col.key === 'kind'}
-      <Badge tone={row.kind === 'composite' ? 'info' : 'neutral'}>{row.kind}</Badge>
-    {:else if col.key === 'sell'}
-      {row.sell_by === 'weight' ? `per ${row.unit_code ?? 'unit'}` : 'unit'}
-    {:else if col.key === 'price'}
-      KES {row.price}
-    {:else if col.key === 'category_name'}
-      {row.category_name ?? '—'}
-    {:else if col.key === 'actions'}
-      <ProductActions {row} {canManage} {canDelete} {busy} onedit={edit} onarchive={archive} />
-    {:else}
-      {(row as unknown as Record<string, unknown>)[col.key] ?? '—'}
-    {/if}
-  {/snippet}
-</DataTable>
+<ProductsTable {rows} {loading} {canManage} {canDelete} {busy} onedit={edit} onarchive={archive} />
 
 <Pager
   page={pageNum}
@@ -242,52 +224,22 @@
   save={saveProduct}
   onsaved={() => {
     load();
+    loadStats();
     loadLookups();
   }}
 />
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-  }
-  h1 {
-    margin: 0;
-    font-size: 1.4rem;
-  }
-  .sub {
-    margin: 0.2rem 0 0;
-    color: var(--text-muted, #667);
-    font-size: 0.85rem;
-  }
-  .actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
   .filters {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-2);
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
   }
   .filters .q {
     flex: 1;
-    max-width: 320px;
-  }
-  select {
-    padding: 0.45rem 0.6rem;
-    border: 1px solid var(--border, #d8dce3);
-    border-radius: 6px;
-    font: inherit;
-  }
-  .chk {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    font-size: 0.85rem;
-    color: var(--text-muted, #667);
+    min-width: 220px;
+    max-width: 340px;
   }
 </style>

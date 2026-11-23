@@ -1,11 +1,16 @@
 <script lang="ts">
+  import './taxonomy.css';
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { Brand, Category, Unit } from '@mauzo/types';
-  import { Button, DataTable, Modal, TextField, toast } from '@mauzo/ui';
+  import { Button, Icon, Modal, PageHeader, Select, TextField, toast } from '@mauzo/ui';
+  import { categoryIcon } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import UnitsPanel from '#lib/catalog/UnitsPanel.svelte';
+
+  type Tab = 'categories' | 'brands' | 'units';
+  let tab = $state<Tab>('categories');
 
   let categories = $state<Category[]>([]);
   let brands = $state<Brand[]>([]);
@@ -27,18 +32,6 @@
   let brandTarget = $state<Brand | null>(null);
   let brandName = $state('');
 
-  // ---- unit modal state -----------------------------------------------------
-
-  const catColumns = [
-    { key: 'name', label: 'Category' },
-    { key: 'parent', label: 'Parent', width: '160px' },
-    { key: 'sort', label: 'Sort', width: '70px', align: 'right' as const },
-    { key: 'actions', label: '', width: '150px', align: 'right' as const },
-  ];
-  const brandColumns = [
-    { key: 'name', label: 'Brand' },
-    { key: 'actions', label: '', width: '150px', align: 'right' as const },
-  ];
   const parentName = $derived.by(() => {
     const m = new Map(categories.map((c) => [c.id, c.name]));
     return (id: string | null) => (id ? (m.get(id) ?? '—') : '—');
@@ -127,129 +120,122 @@
   }
 
   onMount(load);
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'categories', label: 'Categories' },
+    { key: 'brands', label: 'Brands' },
+    { key: 'units', label: 'Units of measure' },
+  ];
 </script>
 
-<svelte:head><title>Categories &amp; units — Mauzo</title></svelte:head>
+<svelte:head><title>Catalogue settings — Mauzo</title></svelte:head>
 
-<h1>Categories, brands &amp; units</h1>
+<div class="taxset">
+  <PageHeader
+    title="Catalogue settings"
+    sub="Manage product categories, brands and units of measure"
+    icon="tags"
+  />
 
-<div class="cols">
-  <section>
-    <header>
-      <h2>Categories</h2>
-      {#if canManage}<Button size="sm" onclick={() => editCat(null)}>+ New</Button>{/if}
-    </header>
-    <DataTable
-      columns={catColumns}
-      rows={categories}
-      rowKey={(r) => r.id}
-      {loading}
-      empty="No categories yet."
-    >
-      {#snippet cell(row, col)}
-        {#if col.key === 'parent'}
-          {parentName(row.parent_id)}
-        {:else if col.key === 'actions' && canManage}
-          <div class="rowbtns">
-            <Button size="sm" variant="ghost" onclick={() => editCat(row)}>Edit</Button>
-            <Button size="sm" variant="ghost" onclick={() => delCat(row)}>Delete</Button>
-          </div>
-        {:else}
-          {(row as unknown as Record<string, unknown>)[col.key] ?? ''}
+  <div class="tabs" role="tablist">
+    {#each TABS as t (t.key)}
+      <button role="tab" aria-selected={tab === t.key} class:on={tab === t.key} onclick={() => (tab = t.key)}>
+        {t.label}
+      </button>
+    {/each}
+  </div>
+
+  {#if tab === 'categories'}
+    <section class="panel">
+      <header class="phead">
+        <h2>Categories</h2>
+        {#if canManage}
+          <Button size="sm" onclick={() => editCat(null)}><Icon name="plus" size={14} /> New category</Button>
         {/if}
-      {/snippet}
-    </DataTable>
-  </section>
-
-  <section>
-    <header>
-      <h2>Brands</h2>
-      {#if canManage}<Button size="sm" onclick={() => editBrand(null)}>+ New</Button>{/if}
-    </header>
-    <DataTable columns={brandColumns} rows={brands} rowKey={(r) => r.id} {loading} empty="No brands yet.">
-      {#snippet cell(row, col)}
-        {#if col.key === 'actions' && canManage}
-          <div class="rowbtns">
-            <Button size="sm" variant="ghost" onclick={() => editBrand(row)}>Edit</Button>
-            <Button size="sm" variant="ghost" onclick={() => delBrand(row)}>Delete</Button>
-          </div>
-        {:else}
-          {(row as unknown as Record<string, unknown>)[col.key] ?? ''}
+      </header>
+      {#if loading}
+        <p class="muted">Loading…</p>
+      {:else if categories.length === 0}
+        <p class="muted">No categories yet.</p>
+      {:else}
+        <ul class="rows">
+          {#each categories as c (c.id)}
+            <li class="row">
+              <span class="chip" aria-hidden="true"><Icon name={categoryIcon(c.name)} size={18} /></span>
+              <span class="rname">{c.name}</span>
+              <span class="rmeta">{parentName(c.parent_id)}</span>
+              <span class="rcount">{c.product_count}</span>
+              {#if canManage}
+                <span class="rbtns">
+                  <Button size="sm" variant="ghost" onclick={() => editCat(c)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onclick={() => delCat(c)}>Delete</Button>
+                </span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+  {:else if tab === 'brands'}
+    <section class="panel">
+      <header class="phead">
+        <h2>Brands</h2>
+        {#if canManage}
+          <Button size="sm" onclick={() => editBrand(null)}><Icon name="plus" size={14} /> New brand</Button>
         {/if}
-      {/snippet}
-    </DataTable>
-  </section>
+      </header>
+      {#if loading}
+        <p class="muted">Loading…</p>
+      {:else if brands.length === 0}
+        <p class="muted">No brands yet.</p>
+      {:else}
+        <ul class="rows">
+          {#each brands as b (b.id)}
+            <li class="row">
+              <span class="chip brand" aria-hidden="true"><Icon name="star" size={17} /></span>
+              <span class="rname">{b.name}</span>
+              <span class="rmeta"></span>
+              <span class="rcount">{b.product_count}</span>
+              {#if canManage}
+                <span class="rbtns">
+                  <Button size="sm" variant="ghost" onclick={() => editBrand(b)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onclick={() => delBrand(b)}>Delete</Button>
+                </span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+  {:else}
+    <section class="panel bare">
+      <UnitsPanel {units} {loading} {canManage} onchange={load} />
+    </section>
+  {/if}
 
-  <UnitsPanel {units} {loading} {canManage} onchange={load} />
+  <Modal bind:open={catOpen} title={catTarget ? 'Edit category' : 'New category'}>
+    <TextField label="Name" bind:value={catName} />
+    <label class="fld">
+      <span>Parent category</span>
+      <Select bind:value={catParent}>
+        <option value="">— none (top level) —</option>
+        {#each categories.filter((c) => c.id !== catTarget?.id) as c (c.id)}<option value={c.id}>
+            {c.name}
+          </option>{/each}
+      </Select>
+    </label>
+    <TextField label="Sort order" type="number" bind:value={catSort} />
+    {#snippet footer()}
+      <Button variant="ghost" onclick={() => (catOpen = false)}>Cancel</Button>
+      <Button onclick={saveCat} disabled={saving || !catName.trim()}>Save</Button>
+    {/snippet}
+  </Modal>
+
+  <Modal bind:open={brandOpen} title={brandTarget ? 'Edit brand' : 'New brand'}>
+    <TextField label="Name" bind:value={brandName} />
+    {#snippet footer()}
+      <Button variant="ghost" onclick={() => (brandOpen = false)}>Cancel</Button>
+      <Button onclick={saveBrand} disabled={saving || !brandName.trim()}>Save</Button>
+    {/snippet}
+  </Modal>
 </div>
-
-<Modal bind:open={catOpen} title={catTarget ? 'Edit category' : 'New category'}>
-  <TextField label="Name" bind:value={catName} />
-  <label class="fld">
-    <span>Parent category</span>
-    <select bind:value={catParent}>
-      <option value="">— none (top level) —</option>
-      {#each categories.filter((c) => c.id !== catTarget?.id) as c (c.id)}<option value={c.id}>
-          {c.name}
-        </option>{/each}
-    </select>
-  </label>
-  <TextField label="Sort order" type="number" bind:value={catSort} />
-  {#snippet footer()}
-    <Button variant="ghost" onclick={() => (catOpen = false)}>Cancel</Button>
-    <Button onclick={saveCat} disabled={saving || !catName.trim()}>Save</Button>
-  {/snippet}
-</Modal>
-
-<Modal bind:open={brandOpen} title={brandTarget ? 'Edit brand' : 'New brand'}>
-  <TextField label="Name" bind:value={brandName} />
-  {#snippet footer()}
-    <Button variant="ghost" onclick={() => (brandOpen = false)}>Cancel</Button>
-    <Button onclick={saveBrand} disabled={saving || !brandName.trim()}>Save</Button>
-  {/snippet}
-</Modal>
-
-<style>
-  h1 {
-    font-size: 1.4rem;
-    margin: 0 0 1rem;
-  }
-  .cols {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 1.5rem;
-    align-items: start;
-  }
-  section header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-  section h2 {
-    font-size: 1rem;
-    margin: 0;
-  }
-  .rowbtns {
-    display: flex;
-    gap: 0.25rem;
-    justify-content: flex-end;
-  }
-  .fld {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.85rem;
-    margin-top: 0.75rem;
-  }
-  .fld span {
-    font-weight: 500;
-    color: var(--text-muted, #667);
-  }
-  select {
-    padding: 0.45rem 0.6rem;
-    border: 1px solid var(--border, #d8dce3);
-    border-radius: 6px;
-    font: inherit;
-  }
-</style>

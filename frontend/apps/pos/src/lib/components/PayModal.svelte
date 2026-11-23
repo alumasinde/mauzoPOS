@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Icon } from '@mauzo/ui';
   // Tender/payment modal — builds the payments array, picks a customer for
   // credit sales, then posts through the desktop bridge (online-first, queued
   // offline). Shows the receipt number + change on success.
@@ -127,7 +128,9 @@
           </select>
           <input class="amt" bind:value={r.amount} inputmode="decimal" placeholder="Amount" />
           {#if rows.length > 1}
-            <button class="x" onclick={() => dropRow(i)} aria-label="Remove">✕</button>
+            <button class="x" onclick={() => dropRow(i)} aria-label="Remove">
+              <Icon name="x" size={13} />
+            </button>
           {/if}
           {#if spec(r.method).tendered}
             <input

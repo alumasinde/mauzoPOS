@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PageHeader } from '@mauzo/ui';
   import { onDestroy, onMount } from 'svelte';
   import AssignmentsPanel from '#lib/receipts/AssignmentsPanel.svelte';
   import { Designer } from '#lib/receipts/designer.svelte.ts';
@@ -14,10 +15,11 @@
   onDestroy(() => d.dispose());
 </script>
 
-<section class="head">
-  <h1>Receipt designer</h1>
-  <p class="muted">Design what customers get from the till. Changes reach each till on its next sync.</p>
-</section>
+<PageHeader
+  title="Receipt designer"
+  sub="Design what customers get from the till. Changes reach each till on its next sync."
+  icon="printer"
+/>
 
 <nav class="tabs" aria-label="Receipt designer sections">
   <button class:active={tab === 'layouts'} onclick={() => (tab = 'layouts')}>Layouts</button>
@@ -40,9 +42,6 @@
 {/if}
 
 <style>
-  .head h1 {
-    margin: 0 0 var(--space-1);
-  }
   .muted {
     color: var(--color-text-muted);
     margin: 0;

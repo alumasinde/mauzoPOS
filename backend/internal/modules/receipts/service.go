@@ -81,7 +81,7 @@ func (s *Service) CreateTemplate(ctx context.Context, tenantID, userID uint64, i
 	if err := s.inTx(ctx, func(r *Repo) error { return r.InsertTemplate(ctx, &t) }); err != nil {
 		return Template{}, err
 	}
-	return t, nil
+	return s.repo.TemplateByID(ctx, tenantID, t.ID) // with database timestamps
 }
 
 // UpdateInput saves a new layout version. Version is the version the editor
@@ -128,7 +128,10 @@ func (s *Service) UpdateTemplate(ctx context.Context, tenantID, userID uint64, p
 		out = t
 		return r.UpdateTemplate(ctx, &t)
 	})
-	return out, err
+	if err != nil {
+		return out, err
+	}
+	return s.repo.TemplateByID(ctx, tenantID, out.ID) // with database timestamps
 }
 
 // ArchiveTemplate removes a layout from the library unless a branch uses it.

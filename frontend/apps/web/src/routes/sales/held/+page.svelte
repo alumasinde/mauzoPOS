@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { HeldSale } from '@mauzo/types';
-  import { DataTable, toast } from '@mauzo/ui';
+  import { DataTable, toast, PageHeader } from '@mauzo/ui';
   import { formatDate } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
 
@@ -40,10 +40,11 @@
   onMount(load);
 </script>
 
-<div class="head">
-  <h1>Held sales</h1>
-  <p class="sub">Carts parked on the tills right now — recall or cancel them from the POS.</p>
-</div>
+<PageHeader
+  title="Held sales"
+  sub="Carts parked on the tills right now — recall or cancel them from the POS."
+  icon="pause"
+/>
 
 <DataTable {columns} {rows} rowKey={(h) => h.id} {loading} empty="No held sales at the moment.">
   {#snippet cell(h: HeldSale, col)}
@@ -58,14 +59,4 @@
 </DataTable>
 
 <style>
-  h1 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0 0 4px;
-  }
-  .sub {
-    color: var(--ink-3, #8a93a6);
-    font-size: 13px;
-    margin: 0 0 16px;
-  }
 </style>

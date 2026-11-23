@@ -34,7 +34,7 @@
     />
   </aside>
   {#if d.body}
-    <section class="card">
+    <section class="card editor">
       <LayoutHeader bind:name={d.name} bind:body={d.body} onchange={() => d.schedulePreview()} />
       <div class="cols">
         <div>
@@ -114,7 +114,7 @@
 <style>
   .designer {
     display: grid;
-    grid-template-columns: 220px minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-columns: 200px minmax(0, 1fr) auto;
     gap: var(--space-4);
     align-items: start;
   }
@@ -137,15 +137,30 @@
     color: var(--color-text-muted);
     margin: 0;
   }
+  .editor {
+    container-type: inline-size;
+  }
   .cols {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
     margin-top: var(--space-4);
   }
   .props {
-    border-left: 1px solid var(--color-border);
-    padding-left: var(--space-4);
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-4);
+  }
+  /* Side by side only when the editor card is wide enough. */
+  @container (min-width: 620px) {
+    .cols {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .props {
+      border-top: 0;
+      padding-top: 0;
+      border-left: 1px solid var(--color-border);
+      padding-left: var(--space-4);
+    }
   }
   .actions {
     display: flex;
@@ -163,6 +178,7 @@
   .preview {
     position: sticky;
     top: 84px;
+    max-width: 460px;
   }
   .empty {
     grid-column: span 2;
@@ -183,16 +199,12 @@
     }
   }
   @media (max-width: 860px) {
-    .designer,
-    .cols {
+    .designer {
       grid-template-columns: minmax(0, 1fr);
     }
     .preview {
       grid-column: auto;
-    }
-    .props {
-      border-left: 0;
-      padding-left: 0;
+      max-width: none;
     }
   }
 </style>

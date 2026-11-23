@@ -27,6 +27,18 @@ func (s *TaxonomyService) CategoryByPublic(ctx context.Context, tenantID uint64,
 	return c.ID, err
 }
 
+// BrandByPublic resolves a public id to the internal id (for filters).
+func (s *TaxonomyService) BrandByPublic(ctx context.Context, tenantID uint64, publicID string) (uint64, error) {
+	b, err := s.repo.BrandByPublicID(ctx, tenantID, publicID)
+	if db.IsNotFound(err) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+	return b.ID, nil
+}
+
 // CategoryPublicID resolves an internal category id to its public id.
 func (s *TaxonomyService) CategoryPublicID(ctx context.Context, tenantID, id uint64) (string, error) {
 	c, err := s.repo.CategoryByID(ctx, tenantID, id)

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Product } from '@mauzo/types';
-  import { Button } from '@mauzo/ui';
+  import { Button, Icon } from '@mauzo/ui';
 
   interface Line {
     product_id: string;
@@ -23,7 +23,9 @@
         {#each products as p (p.id)}<option value={p.id}>{p.name} ({p.sku})</option>{/each}
       </select>
       <input type="number" step="any" placeholder={qtyPlaceholder} title={qtyLabel} bind:value={l.qty} />
-      <Button variant="ghost" size="sm" onclick={() => (lines = lines.filter((_, j) => j !== i))}>✕</Button>
+      <Button variant="ghost" size="sm" onclick={() => (lines = lines.filter((_, j) => j !== i))}>
+        <Icon name="x" size={13} />
+      </Button>
     </div>
   {/each}
   <Button variant="ghost" size="sm" onclick={() => (lines = [...lines, { product_id: '', qty: '' }])}>

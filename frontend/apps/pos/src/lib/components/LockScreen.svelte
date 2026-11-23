@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Icon } from '@mauzo/ui';
   import PinPad from './PinPad.svelte';
   import type { Session } from '../desktop';
 
@@ -19,7 +20,7 @@
 
 <div class="lock">
   <div class="card">
-    <div class="clock">🔒</div>
+    <div class="badge"><Icon name="lock" size={30} /></div>
     <PinPad title="Till locked" subtitle="Sign back in, {session.name}" {error} {busy} onsubmit={onunlock} />
     <button class="switch" onclick={onswitch}>Switch cashier</button>
   </div>
@@ -40,8 +41,12 @@
     padding: var(--space-6);
     text-align: center;
   }
-  .clock {
-    font-size: 2rem;
+  .badge {
+    display: inline-flex;
+    color: var(--color-primary);
+    background: var(--color-surface-muted);
+    border-radius: 50%;
+    padding: var(--space-3);
     margin-bottom: var(--space-2);
   }
   .switch {

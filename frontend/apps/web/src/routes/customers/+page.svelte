@@ -3,7 +3,7 @@
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { ApiError } from '@mauzo/api-client';
   import type { Customer } from '@mauzo/types';
-  import { Badge, Button, DataTable, Icon, Modal, TextField, toast } from '@mauzo/ui';
+  import { Badge, Button, DataTable, Icon, Modal, TextField, toast, PageHeader } from '@mauzo/ui';
   import { formatMoney } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
@@ -96,15 +96,13 @@
   onMount(load);
 </script>
 
-<div class="head">
-  <div>
-    <h1>Customers</h1>
-    <p class="sub">Accounts for credit sales, loyalty and receipts.</p>
-  </div>
-  {#if canManage}
-    <Button onclick={() => edit(null)}><Icon name="plus" size={16} /> New customer</Button>
-  {/if}
-</div>
+<PageHeader title="Customers" sub="Accounts for credit sales, loyalty and receipts." icon="users">
+  {#snippet actions()}
+    {#if canManage}
+      <Button onclick={() => edit(null)}><Icon name="plus" size={16} /> New customer</Button>
+    {/if}
+  {/snippet}
+</PageHeader>
 
 <div class="filters">
   <input
@@ -171,22 +169,6 @@
 </Modal>
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 16px;
-  }
-  h1 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0;
-  }
-  .sub {
-    color: var(--ink-3, #8a93a6);
-    font-size: 13px;
-    margin: 4px 0 0;
-  }
   .filters {
     display: flex;
     gap: 10px;

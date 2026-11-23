@@ -25,6 +25,21 @@ func NewHandler(svc *Service, tax *TaxonomyService) *Handler {
 	return &Handler{svc: svc, tax: tax}
 }
 
+// Overview handles GET /t/catalog/overview — KPI cards on the products page.
+func (h *Handler) Overview(w http.ResponseWriter, r *http.Request) {
+	a, ok := identity.ActorFrom(r.Context())
+	if !ok || a.TenantID == 0 {
+		httpx.WriteError(w, r, httpx.ErrForbidden)
+		return
+	}
+	o, err := h.svc.Overview(r.Context(), a.TenantID)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.OK(w, o)
+}
+
 // List handles GET /t/catalog/products.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	a, ok := identity.ActorFrom(r.Context())
@@ -34,9 +49,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	page := httpx.ParsePage(r)
 	f := ListFilter{Query: page.Query}
-	if status := r.URL.Query().Get("status"); status == StatusArchived {
+	switch status := r.URL.Query().Get("status"); status {
+	case "all":
+		// no status filter
+	case StatusArchived:
 		f.Status = StatusArchived
-	} else {
+	default:
 		f.Status = StatusActive
 	}
 	if cat := r.URL.Query().Get("category_id"); cat != "" {
@@ -46,6 +64,22 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.CategoryID = c
+	}
+	if br := r.URL.Query().Get("brand_id"); br != "" {
+		b, err := h.tax.BrandByPublic(r.Context(), a.TenantID, br)
+		if err != nil {
+			httpx.WriteError(w, r, ErrNotFound)
+			return
+		}
+		f.BrandID = b
+	}
+	switch kind := r.URL.Query().Get("kind"); kind {
+	case "":
+	case KindStandard, KindService, KindPackaged, KindComposite:
+		f.Kind = kind
+	default:
+		httpx.WriteError(w, r, httpx.ErrBadRequest)
+		return
 	}
 	rows, total, err := h.svc.List(r.Context(), a.TenantID, f, page)
 	if err != nil {

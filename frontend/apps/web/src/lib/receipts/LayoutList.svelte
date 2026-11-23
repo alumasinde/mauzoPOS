@@ -113,9 +113,11 @@
     margin: 0;
     padding: 0;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 4px;
   }
   li {
+    min-width: 0;
     display: flex;
     align-items: stretch;
     border: 1px solid var(--color-border);
@@ -132,6 +134,7 @@
   .pick {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
     display: flex;
     align-items: center;
     gap: var(--space-2);

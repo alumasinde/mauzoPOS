@@ -10,6 +10,7 @@ import (
 // its permission (mw.Can rejects with module_disabled when it's off).
 func TenantRoutes(r chi.Router, h *Handler, th *TaxonomyHandler) {
 	r.Route("/catalog", func(r chi.Router) {
+		r.With(mw.Can(PermProductView)).Get("/overview", h.Overview)
 		r.With(mw.Can(PermProductView)).Get("/products", h.List)
 		r.With(mw.Can(PermProductCreate)).Post("/products", h.Create)
 		r.With(mw.Can(PermProductImport)).Post("/products/import", h.Import)

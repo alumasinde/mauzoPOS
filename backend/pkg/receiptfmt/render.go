@@ -156,44 +156,17 @@ func (r *renderer) width(size string) int {
 }
 
 func (r *renderer) block(b Block) {
-	size := b.Size
-	if size == "normal" {
-		size = ""
-	}
 	switch b.Type {
 	case BlockLogo:
 		if r.d.Flags.HasLogo {
 			r.out = append(r.out, Line{Kind: LineLogo, Align: or(b.Align, "center")})
 		}
 	case BlockText:
-		w := r.width(size)
-		for _, src := range strings.Split(b.Text, "\n") {
-			// A line whose variables are all empty ("Tel: {{branch.phone}}"
-			// without a phone) is dropped rather than printed half-filled.
-			if r.allVarsEmpty(src) {
-				continue
-			}
-			for _, ln := range wrap(r.expand(src), w) {
-				r.text(align(ln, w, b.Align), b.Bold, size)
-			}
-		}
+		r.textBlock(b)
 	case BlockDivider:
-		// Two rules in a row (a hidden block between them) print as one.
-		if n := len(r.out); n > 0 && r.out[n-1].Kind == LineText && isRule(r.out[n-1].Text) {
-			return
-		}
-		ch := or(b.Char, "-")
-		r.text(strings.Repeat(ch, r.w), false, "")
+		r.divider(b)
 	case BlockFields:
-		for _, f := range b.Fields {
-			v := strings.TrimSpace(r.expand(f.Value))
-			if v == "" {
-				continue
-			}
-			for _, ln := range pair(r.expand(f.Label), v, r.w) {
-				r.text(ln, b.Bold, "")
-			}
-		}
+		r.fields(b)
 	case BlockItems:
 		r.items(b)
 	case BlockTotals:
@@ -205,35 +178,83 @@ func (r *renderer) block(b Block) {
 	case BlockFiscal:
 		r.fiscal()
 	case BlockQR:
-		if data := strings.TrimSpace(r.expand(b.Data)); data != "" {
-			n := b.QRSize
-			if n == 0 {
-				n = 6
-			}
-			r.out = append(r.out, Line{Kind: LineQR, Data: data, QR: n, Align: or(b.Align, "center")})
-		}
+		r.qr(b)
 	case BlockBarcode:
-		data := strings.TrimSpace(r.expand(b.Data))
-		if data == "" {
-			return
-		}
-		bars, err := barcode.Code128(data)
-		if err != nil {
-			r.text(center(data, r.w), false, "") // non-printable: fall back to text
-			return
-		}
-		var sb strings.Builder
-		for _, on := range bars {
-			if on {
-				sb.WriteByte('1')
-			} else {
-				sb.WriteByte('0')
-			}
-		}
-		r.out = append(r.out, Line{Kind: LineBarcode, Data: data, Bars: sb.String(), Align: or(b.Align, "center")})
+		r.barcode(b)
 	case BlockFeed:
 		r.out = append(r.out, Line{Kind: LineFeed, N: b.Lines})
 	}
+}
+
+func (r *renderer) textBlock(b Block) {
+	size := b.Size
+	if size == "normal" {
+		size = ""
+	}
+	w := r.width(size)
+	for _, src := range strings.Split(b.Text, "\n") {
+		// A line whose variables are all empty ("Tel: {{branch.phone}}"
+		// without a phone) is dropped rather than printed half-filled.
+		if r.allVarsEmpty(src) {
+			continue
+		}
+		for _, ln := range wrap(r.expand(src), w) {
+			r.text(align(ln, w, b.Align), b.Bold, size)
+		}
+	}
+}
+
+func (r *renderer) divider(b Block) {
+	// Two rules in a row (a hidden block between them) print as one.
+	if n := len(r.out); n > 0 && r.out[n-1].Kind == LineText && isRule(r.out[n-1].Text) {
+		return
+	}
+	r.text(strings.Repeat(or(b.Char, "-"), r.w), false, "")
+}
+
+func (r *renderer) fields(b Block) {
+	for _, f := range b.Fields {
+		v := strings.TrimSpace(r.expand(f.Value))
+		if v == "" {
+			continue
+		}
+		for _, ln := range pair(r.expand(f.Label), v, r.w) {
+			r.text(ln, b.Bold, "")
+		}
+	}
+}
+
+func (r *renderer) qr(b Block) {
+	data := strings.TrimSpace(r.expand(b.Data))
+	if data == "" {
+		return
+	}
+	n := b.QRSize
+	if n == 0 {
+		n = 6
+	}
+	r.out = append(r.out, Line{Kind: LineQR, Data: data, QR: n, Align: or(b.Align, "center")})
+}
+
+func (r *renderer) barcode(b Block) {
+	data := strings.TrimSpace(r.expand(b.Data))
+	if data == "" {
+		return
+	}
+	bars, err := barcode.Code128(data)
+	if err != nil {
+		r.text(center(data, r.w), false, "") // non-printable: fall back to text
+		return
+	}
+	var sb strings.Builder
+	for _, on := range bars {
+		if on {
+			sb.WriteByte('1')
+		} else {
+			sb.WriteByte('0')
+		}
+	}
+	r.out = append(r.out, Line{Kind: LineBarcode, Data: data, Bars: sb.String(), Align: or(b.Align, "center")})
 }
 
 func (r *renderer) items(b Block) {

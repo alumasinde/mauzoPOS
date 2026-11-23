@@ -1,6 +1,6 @@
 <script lang="ts" generics="T">
   import type { Snippet } from 'svelte';
-  import { Button } from '@mauzo/ui';
+  import { Button, Icon } from '@mauzo/ui';
 
   /** Titled, add/remove-capable editor for a repeating child list (barcodes,
    *  variants, components, attributes). Renders `row` for each item; the
@@ -25,7 +25,7 @@
   {#each items as item, i (i)}
     <div class="rowline" style:grid-template-columns="{cols} auto">
       {@render row(item)}
-      <Button size="sm" variant="ghost" onclick={() => onremove(i)}>✕</Button>
+      <Button size="sm" variant="ghost" onclick={() => onremove(i)}><Icon name="x" size={13} /></Button>
     </div>
   {/each}
 </section>

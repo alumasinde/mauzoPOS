@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { AuditEntry } from '@mauzo/types';
-  import { DataTable, TextField, toast } from '@mauzo/ui';
+  import { DataTable, TextField, toast, PageHeader } from '@mauzo/ui';
   import { formatDate, formatTime } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
 
@@ -36,12 +36,8 @@
   onMount(load);
 </script>
 
-<section class="head">
-  <div>
-    <h1>Audit log</h1>
-    <p class="muted">{total} entries</p>
-  </div>
-  <div class="tools">
+<PageHeader title="Audit log" sub="{total} entries" icon="list">
+  {#snippet actions()}
     <TextField
       placeholder="Search action / entity…"
       bind:value={q}
@@ -50,8 +46,8 @@
         load();
       }}
     />
-  </div>
-</section>
+  {/snippet}
+</PageHeader>
 
 <DataTable {columns} {rows} rowKey={(r) => r.id} {loading} empty="No audit entries.">
   {#snippet cell(row: AuditEntry, col)}
@@ -90,20 +86,6 @@
 </div>
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
-  }
-  .head h1 {
-    margin: 0 0 var(--space-1);
-  }
-  .muted {
-    color: var(--color-text-muted);
-    margin: 0;
-  }
   .pager {
     display: flex;
     align-items: center;

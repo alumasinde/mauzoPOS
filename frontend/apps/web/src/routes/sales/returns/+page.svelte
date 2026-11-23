@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { SaleReturn } from '@mauzo/types';
-  import { DataTable, Pager, toast } from '@mauzo/ui';
+  import { DataTable, Pager, toast, PageHeader } from '@mauzo/ui';
   import { formatDate, formatMoney } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
 
@@ -41,10 +41,11 @@
   onMount(load);
 </script>
 
-<div class="head">
-  <h1>Returns &amp; refunds</h1>
-  <p class="sub">Refunds processed against sales. Create one from a sale's detail page.</p>
-</div>
+<PageHeader
+  title="Returns & refunds"
+  sub="Refunds processed against sales. Create one from a sale's detail page."
+  icon="undo"
+/>
 
 <DataTable {columns} {rows} rowKey={(r) => r.id} {loading} empty="No returns recorded yet.">
   {#snippet cell(r: SaleReturn, col)}
@@ -69,16 +70,6 @@
 />
 
 <style>
-  h1 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0 0 4px;
-  }
-  .sub {
-    color: var(--ink-3, #8a93a6);
-    font-size: 13px;
-    margin: 0 0 16px;
-  }
   .num {
     text-align: right;
     font-variant-numeric: tabular-nums;

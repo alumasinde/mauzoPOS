@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { PermissionGroup, Role } from '@mauzo/types';
-  import { Badge, Button, DataTable, toast } from '@mauzo/ui';
+  import { Badge, Button, DataTable, toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import RoleEditor from '#lib/roles/RoleEditor.svelte';
@@ -64,15 +64,15 @@
   onMount(load);
 </script>
 
-<section class="head">
-  <div>
-    <h1>Roles & permissions</h1>
-    <p class="muted">What each role can do. Employees get one role each.</p>
-  </div>
-  {#if canManage}
-    <Button onclick={() => open(null)}>New role</Button>
-  {/if}
-</section>
+<PageHeader
+  title="Roles & permissions"
+  sub="What each role can do. Employees get one role each."
+  icon="shield"
+>
+  {#snippet actions()}
+    {#if canManage}<Button onclick={() => open(null)}>New role</Button>{/if}
+  {/snippet}
+</PageHeader>
 
 <DataTable {columns} {rows} rowKey={(r) => r.id} {loading} onrowclick={(r) => open(r)}>
   {#snippet cell(row: Role, col)}
@@ -120,16 +120,6 @@
 <RoleEditor bind:open={editorOpen} role={target} {groups} onsaved={load} />
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
-  }
-  .head h1 {
-    margin: 0 0 var(--space-1);
-  }
   .muted {
     color: var(--color-text-muted);
     margin: 0;

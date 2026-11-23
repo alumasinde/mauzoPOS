@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { OnboardingState } from '@mauzo/types';
-  import { Button, Modal, TextField, toast } from '@mauzo/ui';
+  import { Button, Icon, Modal, PageHeader, TextField, toast } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
 
   const B = '/api/v1/t/onboarding';
@@ -97,18 +97,27 @@
 </script>
 
 <div class="obw">
-  <header><h1>Business setup</h1></header>
+  <PageHeader
+    title="Business setup"
+    sub="Complete your business setup to start using MauzoPOS"
+    icon="store"
+  />
   {#if loading}<p>Loading…</p>
   {:else if st}
     {#if st.done}
-      <div class="done">Setup complete — your business is ready.</div>
+      <div class="done"><Icon name="check-circle" size={18} /> Setup complete — your business is ready.</div>
     {/if}
+    <ol class="steps">
+      {#each STEPS as s, i (s)}
+        <li class:done={st.step > i} class:cur={cur === i + 1}>
+          <span class="dot">
+            {#if st.step > i}<Icon name="check" size={15} strokeWidth={3} />{:else}{i + 1}{/if}
+          </span>
+          <span class="lbl">{s}</span>
+        </li>
+      {/each}
+    </ol>
     <div class="wizard">
-      <ol class="steps">
-        {#each STEPS as s, i (s)}
-          <li class:done={st.step > i} class:cur={cur === i + 1}>{i + 1}. {s}</li>
-        {/each}
-      </ol>
       <div class="panel">
         {#if err}<p class="error">{err}</p>{/if}
         {#if cur === 1}
@@ -241,6 +250,24 @@
           {/if}
         {/if}
       </div>
+      <aside class="side">
+        <div class="prog">
+          <span class="bigcheck" class:all={st.step >= 8}><Icon name="check-circle" size={40} /></span>
+          <h3>Setup {st.step >= 8 ? 'complete' : 'progress'}</h3>
+          <p class="frac">{Math.min(st.step, 8)} / 8</p>
+          <div class="bar"><i style="width:{(Math.min(st.step, 8) / 8) * 100}%"></i></div>
+          {#if st.step < 8}
+            <p class="hint">
+              {cur === 8
+                ? 'Terminal configuration is almost complete.'
+                : 'Keep going — each step saves as you go.'}
+            </p>
+            <p class="next"><span>Next step:</span> {STEPS[Math.min(st.step, 7)]}</p>
+          {:else}
+            <p class="hint">All steps complete — sign in on the POS to start selling.</p>
+          {/if}
+        </div>
+      </aside>
     </div>
   {/if}
 </div>

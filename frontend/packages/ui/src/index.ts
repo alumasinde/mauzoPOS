@@ -16,3 +16,6 @@ export { default as Icon } from './Icon.svelte';
 export { default as Sparkline } from './Sparkline.svelte';
 export { default as AreaChart } from './AreaChart.svelte';
 export { default as DonutChart } from './DonutChart.svelte';
+export { default as PageHeader } from './PageHeader.svelte';
+export { default as StatCard } from './StatCard.svelte';
+export { default as Select } from './Select.svelte';

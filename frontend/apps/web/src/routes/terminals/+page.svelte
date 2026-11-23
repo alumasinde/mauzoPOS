@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { Branch, PosTerminal } from '@mauzo/types';
-  import { Badge, Button, DataTable, Icon, Modal, StatusDot, TextField, toast } from '@mauzo/ui';
+  import { Badge, Button, DataTable, Icon, Modal, StatusDot, TextField, toast, PageHeader } from '@mauzo/ui';
   import { formatDate } from '@mauzo/utils';
   import { api } from '#lib/api.ts';
 
@@ -79,15 +79,17 @@
   onMount(load);
 </script>
 
-<div class="head">
-  <div>
-    <h1>POS terminals</h1>
-    <p class="sub">Windows tills bound to branches. Issue a one-time code to activate a device.</p>
-  </div>
-  <Button onclick={() => (createOpen = true)}>
-    <Icon name="plus" size={16} /> Register terminal
-  </Button>
-</div>
+<PageHeader
+  title="POS terminals"
+  sub="Windows tills bound to branches. Issue a one-time code to activate a device."
+  icon="monitor"
+>
+  {#snippet actions()}
+    <Button onclick={() => (createOpen = true)}>
+      <Icon name="plus" size={16} /> Register terminal
+    </Button>
+  {/snippet}
+</PageHeader>
 
 <DataTable {columns} {rows} rowKey={(t) => t.id} {loading} empty="No terminals registered yet.">
   {#snippet cell(t: PosTerminal, col)}
@@ -157,22 +159,6 @@
 </Modal>
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 18px;
-  }
-  h1 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0;
-  }
-  .sub {
-    color: var(--ink-3, #8a93a6);
-    font-size: 13px;
-    margin: 4px 0 0;
-  }
   .actions {
     text-align: right;
   }

@@ -3,7 +3,7 @@
   import { resolve } from '$app/paths';
   import { ApiError } from '@mauzo/api-client';
   import type { DashboardWidget, OnboardingState } from '@mauzo/types';
-  import { Icon } from '@mauzo/ui';
+  import { Icon, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import { branch } from '#lib/branch.svelte.ts';
@@ -78,23 +78,24 @@
   });
 </script>
 
-<section class="head">
-  <span class="mark" aria-hidden="true"><Icon name="dashboard" size={34} strokeWidth={2.6} /></span>
-  <div class="titles">
-    <h1>Dashboard</h1>
-    <p>Welcome back{firstName ? `, ${firstName}` : ''}! Here's what's happening at {where} {when}.</p>
-  </div>
-  <label class="period">
-    <Icon name="calendar" size={18} />
-    <span class="sr">Period</span>
-    <select value={period} onchange={(e) => setPeriod(e.currentTarget.value as Period)}>
-      {#each PERIODS as p (p.key)}
-        <option value={p.key}>{p.label}</option>
-      {/each}
-    </select>
-    <Icon name="chevron-down" size={16} />
-  </label>
-</section>
+<PageHeader
+  title="Dashboard"
+  sub="Welcome back{firstName ? `, ${firstName}` : ''}! Here's what's happening at {where} {when}."
+  icon="dashboard"
+>
+  {#snippet actions()}
+    <label class="period">
+      <Icon name="calendar" size={18} />
+      <span class="sr">Period</span>
+      <select value={period} onchange={(e) => setPeriod(e.currentTarget.value as Period)}>
+        {#each PERIODS as p (p.key)}
+          <option value={p.key}>{p.label}</option>
+        {/each}
+      </select>
+      <Icon name="chevron-down" size={16} />
+    </label>
+  {/snippet}
+</PageHeader>
 
 {#if pendingSetup}
   <a class="banner" href={resolve('/onboarding')}>
@@ -142,29 +143,6 @@
 {/if}
 
 <style>
-  .head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
-    flex-wrap: wrap;
-  }
-  .mark {
-    color: var(--color-primary);
-  }
-  .titles {
-    flex: 1;
-    min-width: 220px;
-  }
-  h1 {
-    margin: 0;
-    font-size: var(--text-2xl);
-    letter-spacing: -0.01em;
-  }
-  .titles p {
-    margin: 2px 0 0;
-    color: var(--color-text-muted);
-  }
   .period {
     position: relative;
     display: inline-flex;

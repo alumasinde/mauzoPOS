@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { Icon } from '@mauzo/ui';
   // Post-tender confirmation — receipt number + change, or the offline
   // queued state, plus the receipt printing outcome.
   import { desktop, type PayResult } from '../desktop';
@@ -16,9 +18,14 @@
   } = $props();
 
   const bridge = desktop();
-  let printed = $state(result.printed);
-  let printError = $state(result.print_error ?? '');
+  let printed = $state(false);
+  let printError = $state('');
   let busy = $state(false);
+
+  onMount(() => {
+    printed = result.printed;
+    printError = result.print_error ?? '';
+  });
 
   // Print the original once (auto-print off, or the printer was down).
   async function printNow() {
@@ -52,7 +59,7 @@
 
 <div class="print">
   {#if printed}
-    <p class="ok">✓ Receipt printed{result.offline ? ' (provisional)' : ''}</p>
+    <p class="ok"><Icon name="check" size={15} /> Receipt printed{result.offline ? ' (provisional)' : ''}</p>
   {:else if result.can_print}
     {#if printError}<p class="err">Receipt not printed: {printError}</p>{/if}
     <button class="ghost" onclick={printNow} disabled={busy}>

@@ -5,12 +5,14 @@ export interface Category {
   parent_id: string | null;
   name: string;
   sort: number;
+  product_count: number;
   created_at: string;
 }
 
 export interface Brand {
   id: string;
   name: string;
+  product_count: number;
 }
 
 export type UnitKind = 'count' | 'mass' | 'volume' | 'length' | 'time';
@@ -73,7 +75,25 @@ export interface Product {
   status: string;
   category_name: string | null;
   brand_name: string | null;
+  image_url: string | null;
+  stock: string | null;
+  low_stock: boolean;
   updated_at: string;
+}
+
+/** GET /t/catalog/overview — KPI cards on the products page. */
+export interface CatalogOverview {
+  total: number;
+  active: number;
+  archived: number;
+  low_stock: number;
+  added_30d: number;
+  delta_pct: number | null;
+  delta_active: number | null;
+  trend_total: number[];
+  trend_active: number[];
+  trend_archived: number[];
+  trend_low_stock: number[];
 }
 
 export interface ProductDetail extends Product {

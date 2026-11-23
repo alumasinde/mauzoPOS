@@ -65,11 +65,11 @@ func (r *Repo) InsertTemplate(ctx context.Context, t *Template) error {
 	if err != nil {
 		return err
 	}
-	id, err := res.LastInsertId()
+	id, err := lastID(res)
 	if err != nil {
 		return err
 	}
-	t.ID, t.Version = uint64(id), 1
+	t.ID, t.Version = id, 1
 	return r.InsertVersion(ctx, t)
 }
 
@@ -304,8 +304,7 @@ func (r *Repo) InsertIssued(ctx context.Context, i *Issued) error {
 	if err != nil {
 		return err
 	}
-	id, err := res.LastInsertId()
-	i.ID = uint64(id)
+	i.ID, err = lastID(res)
 	return err
 }
 
@@ -320,6 +319,17 @@ func (r *Repo) InsertAudit(ctx context.Context, tenantID, branchID uint64, actor
 		supervisor_id, action, entity_type, entity_id, data) VALUES (?,?,?,?,?,?,?,?,?)`,
 		tenantID, branchID, actorType, actorID, supervisorID, action, "sale", entityID, payload)
 	return err
+}
+
+func lastID(res sql.Result) (uint64, error) {
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	if id < 0 {
+		return 0, errors.New("receipts: negative insert id")
+	}
+	return uint64(id), nil
 }
 
 func notFound(err, target error) error {

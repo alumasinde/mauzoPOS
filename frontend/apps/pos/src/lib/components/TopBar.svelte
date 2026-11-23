@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Icon } from '@mauzo/ui';
   import { formatDate, formatTime } from '@mauzo/utils';
   import type { Status, TerminalInfo, Session } from '../desktop';
 
@@ -23,7 +24,7 @@
 
 <header class="topbar">
   <div class="brand">
-    <span class="logo">🛒</span>
+    <span class="logo"><Icon name="cart" size={26} /></span>
     <div class="names">
       <strong>{info?.tenant ?? 'Mauzo POS'}</strong>
       <span class="tag">Sell smart.</span>
@@ -51,13 +52,15 @@
       class:warn={status?.printer !== 'ready'}
       title={status?.printer === 'ready' ? 'Printer ready' : 'No printer configured'}
     >
-      🖨
+      <Icon name="printer" size={18} />
     </span>
   </div>
   <div class="right">
-    <span class="clock">🕐 {formatDate(now)} {formatTime(now)}</span>
-    <button class="icon" onclick={onsettings} title="Terminal settings">⚙</button>
-    <button class="icon" onclick={onlock} title="Lock (switch cashier)">🔒</button>
+    <span class="clock"><Icon name="clock" size={15} /> {formatDate(now)} {formatTime(now)}</span>
+    <button class="icon" onclick={onsettings} title="Terminal settings"><Icon name="cog" size={20} /></button>
+    <button class="icon" onclick={onlock} title="Lock (switch cashier)">
+      <Icon name="lock" size={20} />
+    </button>
   </div>
 </header>
 
@@ -78,7 +81,11 @@
     gap: var(--space-2);
   }
   .logo {
-    font-size: 1.6rem;
+    display: inline-flex;
+    color: var(--color-primary);
+    background: var(--color-surface);
+    border-radius: var(--radius-sm);
+    padding: 4px;
   }
   .names {
     display: flex;
@@ -130,6 +137,7 @@
     padding: 0 5px;
   }
   .printer {
+    display: inline-flex;
     opacity: 0.9;
   }
   .printer.warn {
@@ -140,6 +148,11 @@
     align-items: center;
     gap: var(--space-3);
     font-size: var(--text-sm);
+  }
+  .clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
   }
   .icon {
     background: none;

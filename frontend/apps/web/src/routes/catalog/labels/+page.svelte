@@ -3,7 +3,7 @@
   import { page } from '$app/state';
   import { ApiError } from '@mauzo/api-client';
   import type { Label } from '@mauzo/types';
-  import { Button, toast } from '@mauzo/ui';
+  import { Button, toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
 
   let labels = $state<Label[]>([]);
@@ -40,11 +40,14 @@
 
 <svelte:head><title>Print labels — Mauzo</title></svelte:head>
 
-<div class="toolbar no-print">
-  <h1>Shelf labels</h1>
-  <label>Copies each <input type="number" min="1" max="100" bind:value={copies} onchange={load} /></label>
-  <Button onclick={() => window.print()}>Print</Button>
-</div>
+<PageHeader title="Shelf labels" sub="Print price labels and barcodes for the shelf." icon="barcode">
+  {#snippet actions()}
+    <label class="no-print">
+      Copies each <input type="number" min="1" max="100" bind:value={copies} onchange={load} />
+    </label>
+    <Button onclick={() => window.print()}>Print</Button>
+  {/snippet}
+</PageHeader>
 
 {#if loading}
   <p class="no-print">Loading…</p>
@@ -68,18 +71,7 @@
 </div>
 
 <style>
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  .toolbar h1 {
-    font-size: 1.3rem;
-    margin: 0;
-    flex: 1;
-  }
-  .toolbar input {
+  label input {
     width: 70px;
     padding: 0.35rem;
     border: 1px solid var(--border, #d8dce3);

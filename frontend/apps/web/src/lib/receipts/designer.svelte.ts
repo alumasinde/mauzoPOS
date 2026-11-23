@@ -81,7 +81,7 @@ export class Designer {
     this.currentId = t.id;
     this.name = t.name;
     this.version = t.version;
-    this.body = structuredClone(t.body);
+    this.body = $state.snapshot(t.body) as ReceiptTemplateBody;
     this.saved = JSON.stringify({ name: this.name, body: this.body });
     this.selected = 0;
     this.schedulePreview(0);
@@ -172,7 +172,7 @@ export class Designer {
   }
 
   restore(v: ReceiptTemplateVersion): void {
-    this.body = structuredClone(v.body);
+    this.body = $state.snapshot(v.body) as ReceiptTemplateBody;
     this.selected = 0;
     this.schedulePreview(0);
     toast.info(`Version ${v.version} loaded — save to make it current`);

@@ -9,11 +9,12 @@ import (
 
 // CategoryResponse is the API shape of a category.
 type CategoryResponse struct {
-	ID        string    `json:"id"`
-	ParentID  *string   `json:"parent_id"`
-	Name      string    `json:"name"`
-	Sort      int       `json:"sort"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	ParentID     *string   `json:"parent_id"`
+	Name         string    `json:"name"`
+	Sort         int       `json:"sort"`
+	ProductCount int       `json:"product_count"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // CategoryRequest creates or updates a category. ParentID is a public id.
@@ -25,8 +26,9 @@ type CategoryRequest struct {
 
 // BrandResponse is the API shape of a brand.
 type BrandResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	ProductCount int    `json:"product_count"`
 }
 
 // BrandRequest creates or renames a brand.
@@ -149,6 +151,9 @@ type ProductResponse struct {
 	// Display-only names resolved for list responses.
 	CategoryName *string   `json:"category_name"`
 	BrandName    *string   `json:"brand_name"`
+	ImageURL     *string   `json:"image_url"`
+	Stock        *string   `json:"stock"`
+	LowStock     bool      `json:"low_stock"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 

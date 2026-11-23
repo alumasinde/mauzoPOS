@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { ModuleGroup, ModuleInfo, ModuleToggleResult } from '@mauzo/types';
-  import { toast } from '@mauzo/ui';
+  import { toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import { nav } from '#lib/nav.svelte.ts';
@@ -78,13 +78,11 @@
   onMount(load);
 </script>
 
-<section class="head">
-  <h1>Modules</h1>
-  <p class="muted">
-    Switch features on or off for your business. Modules your plan does not include are marked; core modules
-    are always on.
-  </p>
-</section>
+<PageHeader
+  title="Modules"
+  sub="Switch features on or off for your business. Modules your plan does not include are marked; core modules are always on."
+  icon="puzzle"
+/>
 
 {#if loading}
   <p class="muted">Loading…</p>
@@ -117,9 +115,6 @@
 <ConfigForm bind:open={configOpen} module={configTarget} onsave={saveConfig} />
 
 <style>
-  .head h1 {
-    margin: 0 0 var(--space-1);
-  }
   .muted {
     color: var(--color-text-muted);
     margin: 0 0 var(--space-5);

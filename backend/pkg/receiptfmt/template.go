@@ -149,100 +149,106 @@ const (
 // Validate checks a template's structure and variables.
 func (t Template) Validate() error {
 	var p []string
-	add := func(i int, f string, a ...any) {
-		prefix := ""
-		if i >= 0 {
-			prefix = fmt.Sprintf("block %d (%s): ", i+1, t.Blocks[i].Type)
-		}
-		p = append(p, prefix+fmt.Sprintf(f, a...))
-	}
 	if t.Paper != 58 && t.Paper != 80 {
-		add(-1, "paper must be 58 or 80")
+		p = append(p, "paper must be 58 or 80")
 	}
 	if t.Columns != 0 && (t.Columns < minColumns || t.Columns > maxColumns) {
-		add(-1, "columns must be between %d and %d", minColumns, maxColumns)
+		p = append(p, fmt.Sprintf("columns must be between %d and %d", minColumns, maxColumns))
 	}
 	if len(t.Blocks) == 0 {
-		add(-1, "add at least one block")
+		p = append(p, "add at least one block")
 	}
 	if len(t.Blocks) > maxBlocks {
-		add(-1, "at most %d blocks", maxBlocks)
-	}
-	checkVars := func(i int, s string) {
-		for _, m := range varRe.FindAllStringSubmatch(s, -1) {
-			if !KnownVariable(m[1]) {
-				add(i, "unknown variable {{%s}}", m[1])
-			}
-		}
+		p = append(p, fmt.Sprintf("at most %d blocks", maxBlocks))
 	}
 	for i, b := range t.Blocks {
-		if b.If != "" && !KnownCondition(strings.TrimPrefix(b.If, "!")) {
-			add(i, "unknown condition %q", b.If)
-		}
-		switch b.Align {
-		case "", "left", "center", "right":
-		default:
-			add(i, "align must be left, center or right")
-		}
-		switch b.Size {
-		case "", "normal", "tall", "wide", "double":
-		default:
-			add(i, "size must be normal, tall, wide or double")
-		}
-		switch b.Type {
-		case BlockLogo, BlockTotals, BlockPayments, BlockTaxSummary, BlockFiscal:
-		case BlockText:
-			if strings.TrimSpace(b.Text) == "" {
-				add(i, "text is empty")
-			}
-			if len(b.Text) > maxText {
-				add(i, "text longer than %d characters", maxText)
-			}
-			checkVars(i, b.Text)
-		case BlockDivider:
-			if len([]rune(b.Char)) > 1 {
-				add(i, "divider char must be one character")
-			}
-		case BlockFields:
-			if len(b.Fields) == 0 || len(b.Fields) > maxFields {
-				add(i, "between 1 and %d fields", maxFields)
-			}
-			for _, f := range b.Fields {
-				if len(f.Label) > 40 || len(f.Value) > 200 {
-					add(i, "field %q is too long", f.Label)
-				}
-				checkVars(i, f.Label)
-				checkVars(i, f.Value)
-			}
-		case BlockItems:
-			switch b.Layout {
-			case "", "detailed", "compact":
-			default:
-				add(i, "layout must be detailed or compact")
-			}
-		case BlockQR, BlockBarcode:
-			if strings.TrimSpace(b.Data) == "" {
-				add(i, "data is empty")
-			}
-			if len(b.Data) > maxData {
-				add(i, "data longer than %d characters", maxData)
-			}
-			if b.QRSize < 0 || b.QRSize > 16 {
-				add(i, "qr_size must be 1–16")
-			}
-			checkVars(i, b.Data)
-		case BlockFeed:
-			if b.Lines < 1 || b.Lines > maxFeed {
-				add(i, "lines must be 1–%d", maxFeed)
-			}
-		default:
-			add(i, "unknown block type")
+		for _, msg := range b.problems() {
+			p = append(p, fmt.Sprintf("block %d (%s): %s", i+1, b.Type, msg))
 		}
 	}
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}
 	}
 	return nil
+}
+
+// problems lists what is wrong with one block.
+func (b Block) problems() []string {
+	var p []string
+	add := func(f string, a ...any) { p = append(p, fmt.Sprintf(f, a...)) }
+	vars := func(s string) {
+		for _, m := range varRe.FindAllStringSubmatch(s, -1) {
+			if !KnownVariable(m[1]) {
+				add("unknown variable {{%s}}", m[1])
+			}
+		}
+	}
+	if b.If != "" && !KnownCondition(strings.TrimPrefix(b.If, "!")) {
+		add("unknown condition %q", b.If)
+	}
+	if !oneOf(b.Align, "", "left", "center", "right") {
+		add("align must be left, center or right")
+	}
+	if !oneOf(b.Size, "", "normal", "tall", "wide", "double") {
+		add("size must be normal, tall, wide or double")
+	}
+	switch b.Type {
+	case BlockLogo, BlockTotals, BlockPayments, BlockTaxSummary, BlockFiscal:
+	case BlockText:
+		if strings.TrimSpace(b.Text) == "" {
+			add("text is empty")
+		}
+		if len(b.Text) > maxText {
+			add("text longer than %d characters", maxText)
+		}
+		vars(b.Text)
+	case BlockDivider:
+		if len([]rune(b.Char)) > 1 {
+			add("divider char must be one character")
+		}
+	case BlockFields:
+		if len(b.Fields) == 0 || len(b.Fields) > maxFields {
+			add("between 1 and %d fields", maxFields)
+		}
+		for _, f := range b.Fields {
+			if len(f.Label) > 40 || len(f.Value) > 200 {
+				add("field %q is too long", f.Label)
+			}
+			vars(f.Label)
+			vars(f.Value)
+		}
+	case BlockItems:
+		if !oneOf(b.Layout, "", "detailed", "compact") {
+			add("layout must be detailed or compact")
+		}
+	case BlockQR, BlockBarcode:
+		if strings.TrimSpace(b.Data) == "" {
+			add("data is empty")
+		}
+		if len(b.Data) > maxData {
+			add("data longer than %d characters", maxData)
+		}
+		if b.QRSize < 0 || b.QRSize > 16 {
+			add("qr_size must be 1–16")
+		}
+		vars(b.Data)
+	case BlockFeed:
+		if b.Lines < 1 || b.Lines > maxFeed {
+			add("lines must be 1–%d", maxFeed)
+		}
+	default:
+		add("unknown block type")
+	}
+	return p
+}
+
+func oneOf(v string, allowed ...string) bool {
+	for _, a := range allowed {
+		if v == a {
+			return true
+		}
+	}
+	return false
 }
 
 // Variables documents every {{variable}} (for the designer's picker).

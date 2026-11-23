@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { PriceHistoryRow, Product } from '@mauzo/types';
-  import { DataTable, Pager, toast } from '@mauzo/ui';
+  import { DataTable, Pager, toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
 
   const PER_PAGE = 25;
@@ -56,12 +56,7 @@
     s ? new Date(s).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—';
 </script>
 
-<div class="head">
-  <div>
-    <h1>Price history</h1>
-    <p class="muted">Every recorded price change, per product.</p>
-  </div>
-</div>
+<PageHeader title="Price history" sub="Every recorded price change, per product." icon="history" />
 
 <div class="filters">
   <select
@@ -107,16 +102,6 @@
 />
 
 <style>
-  .head {
-    margin-bottom: 14px;
-  }
-  .muted {
-    color: var(--fg-muted, #666);
-    margin: 4px 0 0;
-  }
-  h1 {
-    margin: 0;
-  }
   .filters {
     margin-bottom: 12px;
   }

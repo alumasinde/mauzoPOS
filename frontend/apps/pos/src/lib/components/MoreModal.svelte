@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Icon } from '@mauzo/ui';
   // The "More" action sheet — sync, switch cashier, lock, held sales.
   let {
     onclose,
@@ -27,11 +28,13 @@
 <div class="modal">
   <h3>More</h3>
   <div class="grid">
-    <button class="btn" onclick={run(onsync)}>🔄<span>Sync now</span></button>
-    <button class="btn" onclick={run(onswitch)}>👤<span>Switch cashier</span></button>
-    <button class="btn" onclick={run(onlock)}>🔒<span>Lock till</span></button>
-    <button class="btn" onclick={onheld}>⏸<span>Held sales</span></button>
-    <button class="btn" onclick={onlookup}>🔎<span>Find sale</span></button>
+    <button class="btn" onclick={run(onsync)}><Icon name="refresh" size={26} /><span>Sync now</span></button>
+    <button class="btn" onclick={run(onswitch)}>
+      <Icon name="user" size={26} /><span>Switch cashier</span>
+    </button>
+    <button class="btn" onclick={run(onlock)}><Icon name="lock" size={26} /><span>Lock till</span></button>
+    <button class="btn" onclick={onheld}><Icon name="pause" size={26} /><span>Held sales</span></button>
+    <button class="btn" onclick={onlookup}><Icon name="search" size={26} /><span>Find sale</span></button>
   </div>
   <button class="ghost" onclick={onclose}>Close</button>
 </div>
@@ -63,7 +66,7 @@
     border-radius: var(--radius-md);
     background: var(--color-surface);
     cursor: pointer;
-    font-size: 1.4rem;
+    color: var(--color-primary);
   }
   .btn span {
     font-size: var(--text-sm);

@@ -10,6 +10,7 @@
 package printing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -67,7 +68,7 @@ func Send(c Config, job []byte) error {
 	}
 	switch c.Kind {
 	case KindNetwork:
-		conn, err := net.DialTimeout("tcp", c.addr(), 4*time.Second)
+		conn, err := dial(c.addr(), 4*time.Second)
 		if err != nil {
 			return fmt.Errorf("printer %s unreachable: %w", c.addr(), err)
 		}
@@ -100,7 +101,7 @@ func Probe(c Config) string {
 	}
 	switch c.Kind {
 	case KindNetwork:
-		conn, err := net.DialTimeout("tcp", c.addr(), 1500*time.Millisecond)
+		conn, err := dial(c.addr(), 1500*time.Millisecond)
 		if err != nil {
 			return "offline"
 		}
@@ -113,6 +114,13 @@ func Probe(c Config) string {
 		return "ready"
 	}
 	return "ready"
+}
+
+func dial(addr string, timeout time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	var d net.Dialer
+	return d.DialContext(ctx, "tcp", addr)
 }
 
 // List returns the printers installed in Windows (empty elsewhere).

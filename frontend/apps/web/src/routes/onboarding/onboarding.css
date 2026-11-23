@@ -1,48 +1,100 @@
 .obw {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-.obw h1 {
-  margin: 0;
-  font-size: 1.4rem;
 }
 .obw h2 {
   margin: 0 0 0.4rem;
   font-size: 1.1rem;
 }
-.obw .wizard {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 1.5rem;
-}
+
+/* horizontal stepper ---------------------------------------------------- */
 .obw .steps {
-  margin: 0;
+  margin: 0 0 1.5rem;
   padding: 0;
   list-style: none;
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+  align-items: flex-start;
 }
 .obw .steps li {
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  color: var(--muted, #6b7280);
-  font-size: 0.9rem;
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
 }
-.obw .steps li.done {
-  color: var(--primary, #2563eb);
+.obw .steps li::before {
+  content: '';
+  position: absolute;
+  top: 17px;
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--color-border);
 }
-.obw .steps li.cur {
-  background: var(--surface-alt, #f3f4f6);
-  color: inherit;
+.obw .steps li:first-child::before {
+  display: none;
+}
+.obw .steps li.done::before {
+  background: var(--color-success);
+}
+.obw .steps .dot {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.obw .steps li.done .dot {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: #fff;
+}
+.obw .steps li.cur .dot {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+.obw .steps .lbl {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
   font-weight: 600;
+}
+.obw .steps li.cur .lbl {
+  color: var(--color-text);
+}
+.obw .steps li.done .lbl {
+  color: var(--color-text-muted);
+}
+
+/* layout ----------------------------------------------------------------- */
+.obw .wizard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .obw .wizard {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .obw .panel {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-  max-width: 560px;
+  max-width: 620px;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 .obw .grid {
   display: grid;
@@ -60,12 +112,13 @@
   gap: 0.6rem;
   align-items: center;
   padding: 0.7rem 0.9rem;
-  border: 1px solid var(--border, #d1d5db);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .obw .card:has(input:checked) {
-  border-color: var(--primary, #2563eb);
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
 }
 .obw .field {
   display: flex;
@@ -76,25 +129,100 @@
 .field select,
 .obw select {
   padding: 0.5rem 0.6rem;
-  border: 1px solid var(--border, #d1d5db);
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font: inherit;
-  background: var(--surface, #fff);
-  color: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 .obw .muted {
-  color: var(--muted, #6b7280);
+  color: var(--color-text-muted);
   font-size: 0.85rem;
   margin: 0;
 }
 .obw .error {
-  color: var(--danger, #dc2626);
+  color: var(--color-danger);
   margin: 0;
   font-size: 0.9rem;
 }
 .obw .done {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.7rem 1rem;
-  background: #ecfdf5;
-  color: #065f46;
-  border-radius: 8px;
+  margin-bottom: 1rem;
+  background: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
+  color: var(--color-success);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+}
+
+/* progress card ---------------------------------------------------------- */
+.obw .side {
+  position: sticky;
+  top: 84px;
+}
+.obw .prog {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+.obw .prog .bigcheck {
+  display: inline-grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  color: var(--color-primary);
+  margin-bottom: var(--space-3);
+}
+.obw .prog .bigcheck.all {
+  background: color-mix(in srgb, var(--color-success) 16%, var(--color-surface));
+  color: var(--color-success);
+}
+.obw .prog h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.obw .prog .frac {
+  margin: 0.2rem 0 0.8rem;
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.obw .prog .bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+.obw .prog .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-success);
+  transition: width 0.3s;
+}
+.obw .prog .hint {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.obw .prog .next {
+  margin: 0;
+  padding: var(--space-3);
+  text-align: left;
+  font-size: var(--text-sm);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+}
+.obw .prog .next span {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
 }

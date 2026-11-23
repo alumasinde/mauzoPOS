@@ -112,8 +112,7 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 
 	tenantSvc, settingsStore, btSvc, branchSvc, terminalSvc := tenantTooling(conn, tenantRepo, authSvc, roleSvc, registrySvc)
 
-	// Catalog: taxonomy and products, with images on local disk.
-	catalogSvc, taxSvc, err := catalogStack(conn, cfg)
+	catalogSvc, taxSvc, err := catalogStack(conn, cfg) // taxonomy, products, local-disk images
 	if err != nil {
 		return nil, err
 	}

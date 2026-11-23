@@ -11,7 +11,7 @@
     StockMovement,
     ValuationRow,
   } from '@mauzo/types';
-  import { Button, Pager, toast } from '@mauzo/ui';
+  import { Button, Pager, toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
   import { auth } from '#lib/auth.svelte.ts';
   import { branch } from '#lib/branch.svelte.ts';
@@ -119,16 +119,12 @@
   });
 </script>
 
-<div class="head">
-  <div>
-    <h1>Stock</h1>
-    <p class="muted">On-hand balances, ledger movements and alerts.</p>
-  </div>
-  <div class="actions">
+<PageHeader title="Stock" sub="On-hand balances, ledger movements and alerts." icon="layers">
+  {#snippet actions()}
     {#if canEdit}<Button onclick={() => (receiveOpen = true)}>Receive stock</Button>{/if}
     {#if canWaste}<Button variant="ghost" onclick={() => (wasteOpen = true)}>Record wastage</Button>{/if}
-  </div>
-</div>
+  {/snippet}
+</PageHeader>
 
 {#if expiring.length > 0}
   <div class="alert">
@@ -202,16 +198,6 @@
 />
 
 <style>
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 14px;
-  }
-  .actions {
-    display: flex;
-    gap: 8px;
-  }
   .alert {
     padding: 10px 14px;
     border: 1px solid var(--warn, #d97706);
@@ -269,12 +255,5 @@
     gap: 6px;
     align-items: center;
     color: var(--fg-muted, #666);
-  }
-  .muted {
-    color: var(--fg-muted, #666);
-    margin: 4px 0 0;
-  }
-  h1 {
-    margin: 0;
   }
 </style>

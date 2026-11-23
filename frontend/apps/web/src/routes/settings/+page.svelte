@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ApiError } from '@mauzo/api-client';
   import type { SettingEntry } from '@mauzo/types';
-  import { Button, DataTable, Modal, toast } from '@mauzo/ui';
+  import { Button, DataTable, Modal, toast, PageHeader } from '@mauzo/ui';
   import { api } from '#lib/api.ts';
 
   let rows = $state<SettingEntry[]>([]);
@@ -70,7 +70,7 @@
 </script>
 
 <div class="page">
-  <header><h1>Settings</h1></header>
+  <PageHeader title="Settings" sub="Business preferences, tax and receipt options." icon="cog" />
   <DataTable
     {columns}
     {rows}
@@ -118,10 +118,6 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-  }
-  h1 {
-    margin: 0;
-    font-size: 1.4rem;
   }
   .muted {
     color: var(--muted, #6b7280);
