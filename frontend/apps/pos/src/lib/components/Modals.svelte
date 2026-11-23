@@ -2,7 +2,7 @@
   // Checkout modals: price check, quantity, discount, supervisor PIN, the
   // "more" menu, and the unknown-barcode prompt. Pay and held-sale modals are
   // their own components; open() routes to them.
-  import { desktop, type PriceCheckResult } from '../desktop';
+  import { desktop, type PayResult, type PriceCheckResult } from '../desktop';
   import { cart } from '../cart.svelte';
   import { formatMoney } from '../money';
   import PinPad from './PinPad.svelte';
@@ -10,9 +10,19 @@
   import HeldModal from './HeldModal.svelte';
   import ValuePrompt from './ValuePrompt.svelte';
   import MoreModal from './MoreModal.svelte';
+  import LookupModal from './LookupModal.svelte';
 
   type Modal =
-    'none' | 'pricecheck' | 'quantity' | 'discount' | 'held' | 'supervisor' | 'pay' | 'more' | 'unknown';
+    | 'none'
+    | 'pricecheck'
+    | 'quantity'
+    | 'discount'
+    | 'held'
+    | 'supervisor'
+    | 'pay'
+    | 'more'
+    | 'unknown'
+    | 'lookup';
 
   let {
     currency = 'KSh',
@@ -25,7 +35,7 @@
   }: {
     currency?: string;
     method?: string;
-    onpaid: () => void;
+    onpaid: (r: PayResult) => void;
     onhold: (label: string) => void;
     onlock: () => void;
     onsync: () => void;
@@ -77,7 +87,8 @@
     if (!bridge) return;
     supBusy = true;
     try {
-      await bridge.Authorize('pos.supervisor.authorize', pin);
+      const res = await bridge.Authorize('pos.supervisor.authorize', pin);
+      if (res.grant) cart.grant = res.grant; // consumed by the next Pay
       const fn = pendingSupervisor;
       pendingSupervisor = null;
       close();
@@ -112,6 +123,10 @@
   <PayModal {currency} {method} onclose={close} {onpaid} />
 {:else if which === 'held'}
   <HeldModal onclose={close} {onhold} />
+{:else if which === 'lookup'}
+  <div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
+    <LookupModal {currency} onclose={close} />
+  </div>
 {:else if which !== 'none'}
   <div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
     {#if which === 'pricecheck'}
@@ -169,7 +184,14 @@
         />
       </div>
     {:else if which === 'more'}
-      <MoreModal onclose={close} {onlock} {onsync} {onswitch} onheld={() => open('held')} />
+      <MoreModal
+        onclose={close}
+        {onlock}
+        {onsync}
+        {onswitch}
+        onheld={() => open('held')}
+        onlookup={() => open('lookup')}
+      />
     {:else if which === 'unknown'}
       <div class="modal">
         <h3>Unknown barcode</h3>

@@ -134,3 +134,60 @@ func (d *DB) RecordPendingSale(ctx context.Context, id, cart, totals, payment, c
 		id, cart, totals, payment, cashierID, time.Now().UTC().Format(time.RFC3339))
 	return err
 }
+
+// Customer is a synced customer account for the credit-payment picker.
+type Customer struct {
+	ID            uint64  `db:"id" json:"id"`
+	PublicID      string  `db:"public_id" json:"public_id"`
+	Name          string  `db:"name" json:"name"`
+	Phone         string  `db:"phone" json:"phone"`
+	Code          string  `db:"code" json:"code"`
+	CreditLimit   *string `db:"credit_limit" json:"credit_limit"`
+	CreditBalance string  `db:"credit_balance" json:"credit_balance"`
+}
+
+// Customers lists active customer accounts.
+func (d *DB) Customers(ctx context.Context, search string, limit int) ([]Customer, error) {
+	q := `SELECT * FROM customers`
+	args := []any{}
+	if search != "" {
+		q += ` WHERE name LIKE ? OR phone LIKE ? OR code LIKE ?`
+		like := "%" + search + "%"
+		args = append(args, like, like, like)
+	}
+	q += ` ORDER BY name LIMIT ?`
+	args = append(args, limit)
+	out := []Customer{}
+	return out, d.SelectContext(ctx, &out, q, args...)
+}
+
+// PendingSale is a queued offline sale awaiting upload.
+type PendingSale struct {
+	ID        string `db:"id" json:"id"`
+	Payload   string `db:"cart" json:"cart"`
+	Totals    string `db:"totals" json:"totals"`
+	Payment   string `db:"payment" json:"payment"`
+	CashierID string `db:"cashier_id" json:"cashier_id"`
+	CreatedAt string `db:"created_at" json:"created_at"`
+}
+
+// PendingSales lists unuploaded sales oldest-first.
+func (d *DB) PendingSales(ctx context.Context) ([]PendingSale, error) {
+	out := []PendingSale{}
+	return out, d.SelectContext(ctx, &out,
+		`SELECT id, cart, totals, payment, cashier_id, created_at FROM pending_sales
+		 WHERE uploaded = 0 ORDER BY created_at`)
+}
+
+// MarkSaleUploaded clears a pending sale after a successful POST.
+func (d *DB) MarkSaleUploaded(ctx context.Context, id string) error {
+	_, err := d.ExecContext(ctx, `UPDATE pending_sales SET uploaded = 1 WHERE id = ?`, id)
+	return err
+}
+
+// PendingCount is the status-bar badge.
+func (d *DB) PendingCount(ctx context.Context) (int, error) {
+	var n int
+	err := d.GetContext(ctx, &n, `SELECT COUNT(*) FROM pending_sales WHERE uploaded = 0`)
+	return n, err
+}

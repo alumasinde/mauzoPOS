@@ -23,6 +23,12 @@ export const ROUTES = [
   '/pricing',
   '/pricing/promotions',
   '/pricing/history',
+  '/terminals',
+  '/sales',
+  '/sales/history',
+  '/sales/returns',
+  '/sales/held',
+  '/customers',
 ] as const;
 
 export type AppRoute = (typeof ROUTES)[number];

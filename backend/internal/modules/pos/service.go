@@ -12,6 +12,7 @@ import (
 
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/security"
+	"mauzo/internal/modules/sales"
 )
 
 // Sentinel errors.
@@ -32,11 +33,13 @@ const (
 
 // Service owns terminal activation, device auth and PIN verification.
 type Service struct {
-	conn *sqlx.DB
-	repo *Repo
+	conn  *sqlx.DB
+	repo  *Repo
+	sales Sales
 
-	mu    sync.Mutex
-	fails map[uint64]*pinFail
+	mu     sync.Mutex
+	fails  map[uint64]*pinFail
+	grants map[string]grant
 }
 
 type pinFail struct {
@@ -46,7 +49,18 @@ type pinFail struct {
 
 // NewService builds a Service.
 func NewService(conn *sqlx.DB, repo *Repo) *Service {
-	return &Service{conn: conn, repo: repo, fails: map[uint64]*pinFail{}}
+	return &Service{conn: conn, repo: repo, fails: map[uint64]*pinFail{}, grants: map[string]grant{}}
+}
+
+// BindSales attaches the sales service (wired post-construction to avoid an
+// import cycle between the device API and the sales module).
+func (s *Service) BindSales(v Sales) { s.sales = v }
+
+// Sales is the sale-recording surface the device endpoints use.
+type Sales interface {
+	Complete(ctx context.Context, in sales.CompleteInput) (sales.SaleDetail, bool, error)
+	GetByReceipt(ctx context.Context, tenantID, branchID uint64, ref string) (sales.SaleDetail, error)
+	Authz(ctx context.Context, tenantID, userID uint64) (*sales.CashierAuthz, error)
 }
 
 // ---- activation --------------------------------------------------------------
@@ -152,28 +166,6 @@ func (s *Service) SignIn(ctx context.Context, d Device, userID uint64, pin strin
 }
 
 // Authorize verifies a PIN against any user holding the given permission —
-// the supervisor-override check for sensitive POS actions.
-func (s *Service) Authorize(ctx context.Context, d Device, perm, pin string) (string, error) {
-	users, err := s.repo.UsersWithPermission(ctx, d.TenantID, perm)
-	if err != nil {
-		return "", err
-	}
-	for _, u := range users {
-		if s.locked(u.ID) {
-			continue
-		}
-		hash, _, _, err := s.repo.UserPIN(ctx, d.TenantID, u.ID)
-		if err != nil {
-			continue
-		}
-		if security.VerifyPassword(pin, hash) == nil {
-			s.clearFail(u.ID)
-			return u.Name, nil
-		}
-		s.recordFail(u.ID)
-	}
-	return "", ErrBadPIN
-}
 
 func (s *Service) rolePermissions(ctx context.Context, roleID uint64) ([]string, error) {
 	var out []string

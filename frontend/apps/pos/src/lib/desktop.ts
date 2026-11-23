@@ -127,9 +127,24 @@ export interface ActivateResult {
 
 export interface PayResult {
   sale_id: string;
+  receipt_no: number;
   total: string;
-  method: string;
+  change_due: string;
   offline: boolean;
+}
+
+export interface AuthorizeResult {
+  name: string;
+  grant: string;
+}
+
+export interface Customer {
+  id: string;
+  code: string;
+  name: string;
+  phone: string;
+  credit_limit: string;
+  credit_balance: string;
 }
 
 export interface POSLayout {
@@ -173,7 +188,7 @@ interface DesktopApp {
   Login(cashierID: string, pin: string): Promise<Session>;
   Logout(): Promise<void>;
   CurrentSession(): Promise<Session | null>;
-  Authorize(permission: string, pin: string): Promise<string>;
+  Authorize(permission: string, pin: string): Promise<AuthorizeResult>;
   Can(permission: string): Promise<boolean>;
   Categories(): Promise<Category[]>;
   Grid(categoryID: number): Promise<Product[]>;
@@ -185,7 +200,19 @@ interface DesktopApp {
   HeldList(): Promise<Held[]>;
   RecallHeld(id: string): Promise<Held>;
   CancelHeld(id: string): Promise<void>;
-  Pay(method: string, cartJSON: string, totalsJSON: string): Promise<PayResult>;
+  Pay(
+    paymentsJSON: string,
+    cartJSON: string,
+    orderDiscount: string,
+    customerID: string,
+    grant: string,
+    note: string,
+  ): Promise<PayResult>;
+  SyncPending(): Promise<number>;
+  PendingSales(): Promise<number>;
+  Heartbeat(): Promise<boolean>;
+  SaleDetail(ref: string): Promise<unknown>;
+  Customers(search: string): Promise<Customer[]>;
   GetSettings(): Promise<TerminalSettings>;
   Layout(): Promise<POSLayout>;
   SaveSettings(s: TerminalSettings): Promise<void>;

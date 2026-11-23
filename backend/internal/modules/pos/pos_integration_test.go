@@ -281,9 +281,9 @@ func TestSyncSignInAndHeld(t *testing.T) {
 	}
 
 	// Supervisor authorize: Jane's PIN grants pos.supervisor.authorize here.
-	name, err := f.svc.Authorize(f.ctx, d, "pos.supervisor.authorize", "2468")
-	if err != nil || name != "Jane" {
-		t.Fatalf("authorize %q %v", name, err)
+	res, err := f.svc.Authorize(f.ctx, d, "pos.supervisor.authorize", "2468")
+	if err != nil || res.Name != "Jane" || res.Grant == "" {
+		t.Fatalf("authorize %+v %v", res, err)
 	}
 	if _, err := f.svc.Authorize(f.ctx, d, "pos.supervisor.authorize", "0000"); !errors.Is(err, pos.ErrBadPIN) {
 		t.Fatalf("bad supervisor pin: %v", err)

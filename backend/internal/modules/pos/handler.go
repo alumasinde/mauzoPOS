@@ -108,12 +108,12 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 	if req.Permission == "" {
 		req.Permission = PermSupervisorAuthorize
 	}
-	name, err := h.svc.Authorize(r.Context(), d, req.Permission, req.PIN)
+	res, err := h.svc.Authorize(r.Context(), d, req.Permission, req.PIN)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.OK(w, map[string]any{"ok": true, "authorized_by": name})
+	httpx.OK(w, map[string]any{"ok": true, "authorized_by": res.Name, "grant": res.Grant})
 }
 
 // Held handles GET /pos/held (list) and POST /pos/held (park).

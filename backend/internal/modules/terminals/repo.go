@@ -18,6 +18,8 @@ func NewRepo(conn *sqlx.DB) *Repo { return &Repo{db: conn} }
 
 const cols = `id, tenant_id, branch_id, public_id, name, status, device_name, activated_at, last_seen_at, created_at, updated_at`
 
+const colsJoin = `t.id, t.tenant_id, t.branch_id, t.public_id, t.name, t.status, t.device_name, t.activated_at, t.last_seen_at, t.created_at, t.updated_at`
+
 // SetActivationCode stores the hashed one-time code; NULL clears it.
 func (r *Repo) SetActivationCode(ctx context.Context, terminalID uint64, hash *string) error {
 	_, err := r.db.ExecContext(ctx,
@@ -25,11 +27,13 @@ func (r *Repo) SetActivationCode(ctx context.Context, terminalID uint64, hash *s
 	return err
 }
 
-// List returns a tenant's terminals.
+// List returns a tenant's terminals with branch names.
 func (r *Repo) List(ctx context.Context, tenantID uint64) ([]Terminal, error) {
 	var out []Terminal
 	err := r.db.SelectContext(ctx, &out,
-		`SELECT `+cols+` FROM pos_terminals WHERE tenant_id = ? ORDER BY name`, tenantID)
+		`SELECT `+colsJoin+`, b.name AS branch_name
+		 FROM pos_terminals t JOIN branches b ON b.id = t.branch_id
+		 WHERE t.tenant_id = ? ORDER BY t.name`, tenantID)
 	return out, err
 }
 

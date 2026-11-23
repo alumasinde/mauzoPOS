@@ -202,7 +202,8 @@ func (r *Repo) PromoTargets(ctx context.Context, tenantID uint64, now time.Time)
 func (r *Repo) Cashiers(ctx context.Context, tenantID uint64) ([]SyncCashier, error) {
 	var out []SyncCashier
 	err := r.conn.SelectContext(ctx, &out,
-		`SELECT u.id, u.public_id, u.name, r.name AS role_name, u.pin_hash, u.all_branches
+		`SELECT u.id, u.public_id, u.name, r.name AS role_name, u.pin_hash, u.all_branches,
+			r.max_discount_percent
 		 FROM users u JOIN roles r ON r.id = u.role_id
 		 WHERE u.tenant_id = ? AND u.status = 'active' AND u.pin_hash IS NOT NULL
 		 ORDER BY u.name`, tenantID)
@@ -216,6 +217,19 @@ func (r *Repo) CashierBranches(ctx context.Context, tenantID uint64) ([]SyncCash
 		`SELECT ub.user_id, ub.branch_id FROM user_branches ub
 		 JOIN users u ON u.id = ub.user_id
 		 WHERE u.tenant_id = ? AND u.status = 'active'`, tenantID)
+	return out, err
+}
+
+// Customers returns active customers for the credit-payment picker.
+func (r *Repo) Customers(ctx context.Context, tenantID uint64) ([]SyncCustomer, error) {
+	var out []SyncCustomer
+	err := r.conn.SelectContext(ctx, &out,
+		`SELECT c.id, c.public_id, c.name, c.phone, c.code, c.credit_limit,
+			(SELECT COALESCE(SUM(p.amount),0) FROM sale_payments p
+			 JOIN sales s ON s.id = p.sale_id
+			 WHERE p.tenant_id = c.tenant_id AND p.method = 'credit' AND p.status = 'confirmed'
+			   AND s.customer_id = c.id AND s.status <> 'voided') AS credit_balance
+		 FROM customers c WHERE c.tenant_id = ? AND c.status = 'active' ORDER BY c.name`, tenantID)
 	return out, err
 }
 

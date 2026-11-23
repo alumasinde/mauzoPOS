@@ -189,8 +189,13 @@ export interface Branch {
 export interface PosTerminal {
   id: string;
   branch_id: number;
+  branch?: string;
   name: string;
   status: 'pending' | 'active' | 'disabled';
+  device_name?: string | null;
+  activated_at?: string | null;
+  last_seen_at?: string | null;
+  online?: boolean;
 }
 
 export interface SettingEntry {
@@ -216,3 +221,4 @@ export * from './phase3';
 export * from './catalog';
 export * from './inventory';
 export * from './pricing';
+export * from './sales';

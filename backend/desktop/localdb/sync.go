@@ -90,7 +90,17 @@ type Bundle struct {
 		RoleName    string   `json:"role_name"`
 		PINHash     *string  `json:"pin_hash"`
 		Permissions []string `json:"permissions"`
+		MaxDiscount *string  `json:"max_discount_percent"`
 	} `json:"cashiers"`
+	Customers []struct {
+		ID            uint64  `json:"id"`
+		PublicID      string  `json:"public_id"`
+		Name          string  `json:"name"`
+		Phone         string  `json:"phone"`
+		Code          string  `json:"code"`
+		CreditLimit   *string `json:"credit_limit"`
+		CreditBalance string  `json:"credit_balance"`
+	} `json:"customers"`
 	Settings []struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
@@ -110,7 +120,7 @@ func (d *DB) ApplySync(ctx context.Context, b Bundle) error {
 
 	rebuild := []string{
 		"categories", "units", "barcodes", "price_lists", "price_items",
-		"promotions", "promo_targets", "cashiers", "settings", "modules", "variants",
+		"promotions", "promo_targets", "cashiers", "settings", "modules", "variants", "customers",
 	}
 	for _, t := range rebuild {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+t); err != nil {
@@ -221,8 +231,16 @@ func applyAccess(ctx context.Context, tx *sqlx.Tx, b Bundle) error {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO cashiers (id, name, role_name, pin_hash, permissions) VALUES (?,?,?,?,?)`,
-			c.ID, c.Name, c.RoleName, c.PINHash, string(perms)); err != nil {
+			`INSERT INTO cashiers (id, name, role_name, pin_hash, permissions, max_discount) VALUES (?,?,?,?,?,?)`,
+			c.ID, c.Name, c.RoleName, c.PINHash, string(perms), c.MaxDiscount); err != nil {
+			return err
+		}
+	}
+	for _, cu := range b.Customers {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO customers (id, public_id, name, phone, code, credit_limit, credit_balance)
+			 VALUES (?,?,?,?,?,?,?)`,
+			cu.ID, cu.PublicID, cu.Name, cu.Phone, cu.Code, cu.CreditLimit, cu.CreditBalance); err != nil {
 			return err
 		}
 	}

@@ -148,28 +148,6 @@ func (a *App) CancelHeld(id string) error {
 	return a.db.DeleteHeldCart(a.ctx, id)
 }
 
-// PayResult is what the UI shows after tendering.
-type PayResult struct {
-	SaleID  string `json:"sale_id"`
-	Total   string `json:"total"`
-	Method  string `json:"method"`
-	Offline bool   `json:"offline"`
-}
-
-// Pay completes the sale locally. The pending_sales row is the source for the
-// Phase 7 upload pipeline — checkout works fully offline.
-func (a *App) Pay(method, cartJSON, totalsJSON string) (PayResult, error) {
-	if a.db == nil {
-		return PayResult{}, errors.New("local database not ready")
-	}
-	id := security.NewPublicID()
-	cashier := a.cashierID()
-	if err := a.db.RecordPendingSale(a.ctx, id, cartJSON, totalsJSON, method, cashier); err != nil {
-		return PayResult{}, err
-	}
-	return PayResult{SaleID: id, Method: method, Offline: !a.online()}, nil
-}
-
 func (a *App) cashierID() string {
 	if s := a.CurrentSession(); s != nil {
 		return s.CashierID

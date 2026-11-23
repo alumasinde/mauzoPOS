@@ -21,6 +21,10 @@ function newCart() {
   let rows = $state<CartRow[]>([]);
   let totals = $state<Quote>(EMPTY);
   let selected = $state(0);
+  // One-time supervisor grant + chosen customer, consumed by the next Pay.
+  let grant = $state('');
+  let customerID = $state('');
+  let customerName = $state('');
   const bridge = desktop();
 
   function sameLine(r: CartRow, product_id: number, variant_id: number) {
@@ -56,6 +60,22 @@ function newCart() {
     },
     get count() {
       return rows.length;
+    },
+    get grant() {
+      return grant;
+    },
+    set grant(v: string) {
+      grant = v;
+    },
+    get customerID() {
+      return customerID;
+    },
+    get customerName() {
+      return customerName;
+    },
+    setCustomer(id: string, name: string) {
+      customerID = id;
+      customerName = name;
     },
 
     select(i: number) {
@@ -123,6 +143,9 @@ function newCart() {
       rows = [];
       totals = EMPTY;
       selected = 0;
+      grant = '';
+      customerID = '';
+      customerName = '';
     },
 
     /** Serialise for hold/sale. */

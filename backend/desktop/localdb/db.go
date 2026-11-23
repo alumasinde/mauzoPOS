@@ -118,8 +118,20 @@ CREATE TABLE IF NOT EXISTS cashiers (
     name        TEXT NOT NULL,
     role_name   TEXT NOT NULL,
     pin_hash    TEXT NOT NULL,
-    permissions TEXT NOT NULL DEFAULT '[]'
+    permissions TEXT NOT NULL DEFAULT '[]',
+    max_discount TEXT
 );
+
+CREATE TABLE IF NOT EXISTS customers (
+    id             INTEGER PRIMARY KEY,
+    public_id      TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    phone          TEXT NOT NULL DEFAULT '',
+    code           TEXT NOT NULL DEFAULT '',
+    credit_limit   TEXT,
+    credit_balance TEXT NOT NULL DEFAULT '0'
+);
+CREATE INDEX IF NOT EXISTS ix_customers_name ON customers(name COLLATE NOCASE);
 
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,

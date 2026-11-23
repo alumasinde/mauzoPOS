@@ -100,29 +100,38 @@ func (a *App) CurrentSession() *Session {
 	return a.session
 }
 
+// AuthorizeResult carries the supervisor's name and — online — a one-time
+// grant token the next /pos/sales call can attach for above-limit actions.
+type AuthorizeResult struct {
+	Name  string `json:"name"`
+	Grant string `json:"grant"`
+}
+
 // Authorize checks a supervisor PIN for a sensitive action. Online it asks
-// the server; offline it scans synced cashiers holding the permission.
-func (a *App) Authorize(permission, pin string) (string, error) {
+// the server; offline it scans synced cashiers holding the permission (no
+// grant is minted — offline above-limit actions are refused server-side anyway).
+func (a *App) Authorize(permission, pin string) (AuthorizeResult, error) {
 	if a.db == nil {
-		return "", errors.New("local database not ready")
+		return AuthorizeResult{}, errors.New("local database not ready")
 	}
 	var out struct {
 		OK           bool   `json:"ok"`
 		AuthorizedBy string `json:"authorized_by"`
+		Grant        string `json:"grant"`
 	}
 	err := a.request("POST", "/api/v1/pos/authorize",
 		map[string]string{"permission": permission, "pin": pin}, &out)
 	if err == nil {
-		return out.AuthorizedBy, nil
+		return AuthorizeResult{Name: out.AuthorizedBy, Grant: out.Grant}, nil
 	}
 	if !errors.Is(err, ErrOffline) {
-		return "", err
+		return AuthorizeResult{}, err
 	}
 	name, lerr := a.db.AuthorizePIN(a.ctx, permission, pin)
 	if lerr != nil {
-		return "", errors.New("wrong PIN")
+		return AuthorizeResult{}, errors.New("wrong PIN")
 	}
-	return name, nil
+	return AuthorizeResult{Name: name}, nil
 }
 
 // Can reports whether the signed-in cashier holds a permission (UI hint —

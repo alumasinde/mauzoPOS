@@ -24,4 +24,6 @@ type Terminal struct {
 	LastSeenAt  *time.Time `db:"last_seen_at"`
 	CreatedAt   time.Time  `db:"created_at"`
 	UpdatedAt   time.Time  `db:"updated_at"`
+
+	BranchName string `db:"branch_name"` // joined, list only
 }

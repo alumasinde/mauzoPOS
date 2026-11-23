@@ -193,6 +193,27 @@ func (s *Service) locationOrDefault(ctx context.Context, q db.Querier, tenantID,
 // changes — receive, wastage, documents — funnel through here.
 func (s *Service) post(ctx context.Context, tenantID, actorID uint64, kind, refType, refID, reason, note string, lines []stockLine, sign int) error {
 	return db.WithTx(ctx, s.conn, func(tx *sqlx.Tx) error {
+		return s.postInTx(ctx, tx, tenantID, actorID, kind, refType, refID, reason, note, lines, sign)
+	})
+}
+
+// PostStockInTx resolves item rows and posts ledger movements inside a
+// caller-owned transaction — the sales module decrements stock atomically
+// with the sale row this way. sign < 0 decrements (sale/wastage), > 0
+// increments (receive/return restock).
+func (s *Service) PostStockInTx(ctx context.Context, tx *sqlx.Tx, tenantID, actorID, branchID uint64,
+	kind, refType, refID, reason, note string, items []LineRequest, sign int) error {
+	lines, err := s.resolveLines(ctx, tx, tenantID, branchID, items)
+	if err != nil {
+		return err
+	}
+	return s.postInTx(ctx, tx, tenantID, actorID, kind, refType, refID, reason, note, lines, sign)
+}
+
+// postInTx is the transaction body of post: movements + balances.
+func (s *Service) postInTx(ctx context.Context, tx *sqlx.Tx, tenantID, actorID uint64,
+	kind, refType, refID, reason, note string, lines []stockLine, sign int) error {
+	{
 		movs := make([]Movement, 0, len(lines))
 		for _, l := range lines {
 			qty := l.qty
@@ -229,7 +250,7 @@ func (s *Service) post(ctx context.Context, tenantID, actorID uint64, kind, refT
 			}
 		}
 		return nil
-	})
+	}
 }
 
 // allocateBatches splits outbound movements that carry no batch across the

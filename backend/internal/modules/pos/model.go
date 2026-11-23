@@ -140,6 +140,17 @@ type SyncPromoTarget struct {
 	CategoryID  uint64 `db:"category_id" json:"category_id"` // 0 = not category-targeted
 }
 
+// SyncCustomer is a customer account for the credit-payment picker.
+type SyncCustomer struct {
+	ID            uint64  `db:"id" json:"id"`
+	PublicID      string  `db:"public_id" json:"public_id"`
+	Name          string  `db:"name" json:"name"`
+	Phone         string  `db:"phone" json:"phone"`
+	Code          string  `db:"code" json:"code"`
+	CreditLimit   *string `db:"credit_limit" json:"credit_limit"`
+	CreditBalance string  `db:"credit_balance" json:"credit_balance"`
+}
+
 // SyncCashier is an employee allowed to sign in at the terminal.
 type SyncCashier struct {
 	ID          uint64  `db:"id" json:"id"`
@@ -148,6 +159,7 @@ type SyncCashier struct {
 	RoleName    string  `db:"role_name" json:"role_name"`
 	PINHash     *string `db:"pin_hash" json:"pin_hash"`
 	AllBranches bool    `db:"all_branches" json:"all_branches"`
+	MaxDiscount *string `db:"max_discount_percent" json:"max_discount_percent"`
 }
 
 // SyncCashierBranch is a branch-assignment row for restricted cashiers.

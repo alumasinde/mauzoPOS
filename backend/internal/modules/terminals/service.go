@@ -37,15 +37,18 @@ type CreateRequest struct {
 	Name     string `json:"name"`
 }
 
-// Response is the API view of a terminal.
+// Response is the API view of a terminal. `online` derives from last_seen_at
+// (the device pings /pos/heartbeat on an interval).
 type Response struct {
 	ID          string     `json:"id"`
 	BranchID    uint64     `json:"branch_id"`
+	Branch      string     `json:"branch"`
 	Name        string     `json:"name"`
 	Status      string     `json:"status"`
 	DeviceName  *string    `json:"device_name"`
 	ActivatedAt *time.Time `json:"activated_at"`
 	LastSeenAt  *time.Time `json:"last_seen_at"`
+	Online      bool       `json:"online"`
 }
 
 // List returns the tenant's terminals.
@@ -108,8 +111,14 @@ func (s *Service) IssueCode(ctx context.Context, tenantID uint64, publicID strin
 
 func ptr[T any](v T) *T { return &v }
 
+// onlineWindow is how fresh last_seen must be to count as online — the
+// desktop heartbeats every 45s, so a device quiet for 3 minutes is offline.
+const onlineWindow = 3 * time.Minute
+
 // ToResponse maps a Terminal to its API view.
 func ToResponse(t Terminal) Response {
-	return Response{ID: t.PublicID, BranchID: t.BranchID, Name: t.Name, Status: t.Status,
-		DeviceName: t.DeviceName, ActivatedAt: t.ActivatedAt, LastSeenAt: t.LastSeenAt}
+	return Response{ID: t.PublicID, BranchID: t.BranchID, Branch: t.BranchName,
+		Name: t.Name, Status: t.Status, DeviceName: t.DeviceName,
+		ActivatedAt: t.ActivatedAt, LastSeenAt: t.LastSeenAt,
+		Online: t.LastSeenAt != nil && time.Since(*t.LastSeenAt) < onlineWindow}
 }

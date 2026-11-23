@@ -21,8 +21,9 @@ type Product struct {
 	VatRate    *string `db:"vat_rate" json:"vat_rate"`
 	TrackStock bool    `db:"track_stock" json:"track_stock"`
 
-	VariantID   uint64 `db:"variant_id" json:"variant_id"`     // 0 = base product
-	VariantName string `db:"variant_name" json:"variant_name"` // "" = base product
+	VariantID       uint64 `db:"variant_id" json:"variant_id"`               // 0 = base product
+	VariantName     string `db:"variant_name" json:"variant_name"`           // "" = base product
+	VariantPublicID string `db:"variant_public_id" json:"variant_public_id"` // for sale uploads
 }
 
 // Category is a grid filter tile.
@@ -75,12 +76,12 @@ func (d *DB) Search(ctx context.Context, term string, limit int) ([]Product, err
 	like := "%" + strings.TrimSpace(term) + "%"
 	var rows []Product
 	err := d.SelectContext(ctx, &rows,
-		`SELECT `+productCols+`, 0 AS variant_id, '' AS variant_name FROM products
+		`SELECT `+productCols+`, 0 AS variant_id, '' AS variant_name, '' AS variant_public_id FROM products
 		 WHERE (name LIKE ? OR sku LIKE ?) AND kind <> 'service'
 		 UNION ALL
 		 SELECT p.id, p.public_id, p.sku, p.name || ' · ' || v.name, p.kind, p.category_id,
 			p.unit_code, p.sell_by, COALESCE(v.price, p.price) AS price, p.vat_rate, p.track_stock,
-			v.id AS variant_id, v.name AS variant_name
+			v.id AS variant_id, v.name AS variant_name, v.public_id AS variant_public_id
 		 FROM variants v JOIN products p ON p.id = v.product_id
 		 WHERE (v.name LIKE ? OR v.sku LIKE ?)
 		 ORDER BY name LIMIT ?`,
@@ -92,13 +93,15 @@ func (d *DB) Search(ctx context.Context, term string, limit int) ([]Product, err
 func (d *DB) ByBarcode(ctx context.Context, code string) (Product, string, error) {
 	var row struct {
 		Product
-		VariantID   uint64 `db:"variant_id"`
-		VariantName string `db:"variant_name"`
-		PackQty     string `db:"pack_qty"`
+		VariantID       uint64 `db:"variant_id"`
+		VariantName     string `db:"variant_name"`
+		VariantPublicID string `db:"variant_public_id"`
+		PackQty         string `db:"pack_qty"`
 	}
 	err := d.GetContext(ctx, &row,
 		`SELECT p.`+strings.ReplaceAll(productCols, ",", ", p.")+`,
-			b.variant_id, COALESCE(v.name,'') AS variant_name, b.pack_qty
+			b.variant_id, COALESCE(v.name,'') AS variant_name,
+			COALESCE(v.public_id,'') AS variant_public_id, b.pack_qty
 		 FROM barcodes b
 		 JOIN products p ON p.id = b.product_id
 		 LEFT JOIN variants v ON v.id = b.variant_id
@@ -112,6 +115,7 @@ func (d *DB) ByBarcode(ctx context.Context, code string) (Product, string, error
 	p := row.Product
 	p.VariantID = row.VariantID
 	p.VariantName = row.VariantName
+	p.VariantPublicID = row.VariantPublicID
 	return p, row.PackQty, nil
 }
 
@@ -119,7 +123,8 @@ func (d *DB) ByBarcode(ctx context.Context, code string) (Product, string, error
 func (d *DB) ByItemCode(ctx context.Context, item string) (Product, error) {
 	var rows []Product
 	err := d.SelectContext(ctx, &rows,
-		`SELECT `+productCols+`, 0 AS variant_id FROM products WHERE sku = ? LIMIT 2`, item)
+		`SELECT `+productCols+`, 0 AS variant_id, '' AS variant_name, '' AS variant_public_id
+		 FROM products WHERE sku = ? LIMIT 2`, item)
 	if err != nil {
 		return Product{}, err
 	}
@@ -139,4 +144,53 @@ func (d *DB) Setting(ctx context.Context, key string) (string, error) {
 		return "", nil
 	}
 	return v, err
+}
+
+// ProductRefs maps local product/variant ids to their server public ids for
+// sale uploads.
+type ProductRefs struct {
+	Products map[uint64]string
+	Variants map[uint64]string
+}
+
+// ProductRefs resolves public ids for a set of local product ids.
+func (d *DB) ProductRefs(ctx context.Context, ids []uint64) (*ProductRefs, error) {
+	out := &ProductRefs{Products: map[uint64]string{}, Variants: map[uint64]string{}}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	marks := ""
+	for i := range ids {
+		if i > 0 {
+			marks += ","
+		}
+		marks += "?"
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	prows := []struct {
+		ID       uint64 `db:"id"`
+		PublicID string `db:"public_id"`
+	}{}
+	if err := d.SelectContext(ctx, &prows,
+		`SELECT id, public_id FROM products WHERE id IN (`+marks+`)`, args...); err != nil {
+		return nil, err
+	}
+	for _, r := range prows {
+		out.Products[r.ID] = r.PublicID
+	}
+	vrows := []struct {
+		ID       uint64 `db:"id"`
+		PublicID string `db:"public_id"`
+	}{}
+	if err := d.SelectContext(ctx, &vrows,
+		`SELECT id, public_id FROM variants WHERE id IN (`+marks+`)`, args...); err != nil {
+		return nil, err
+	}
+	for _, r := range vrows {
+		out.Variants[r.ID] = r.PublicID
+	}
+	return out, nil
 }

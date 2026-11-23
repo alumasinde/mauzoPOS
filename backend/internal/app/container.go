@@ -20,6 +20,7 @@ import (
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
 	"mauzo/internal/modules/catalog"
+	"mauzo/internal/modules/customers"
 	"mauzo/internal/modules/inventory"
 	"mauzo/internal/modules/onboarding"
 	"mauzo/internal/modules/pos"
@@ -27,6 +28,7 @@ import (
 	_ "mauzo/internal/modules/registerall" // complete permission registry
 	"mauzo/internal/modules/registry"
 	"mauzo/internal/modules/roles"
+	"mauzo/internal/modules/sales"
 	"mauzo/internal/modules/settings"
 	"mauzo/internal/modules/subscriptions"
 	"mauzo/internal/modules/system"
@@ -74,6 +76,8 @@ type Container struct {
 	Modules       *registry.Handler
 	POS           *pos.Handler
 	POSSvc        *pos.Service
+	Customers     *customers.Handler
+	Sales         *sales.Handler
 }
 
 // NewContainer builds the logger, database pool and module services.
@@ -112,7 +116,10 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		return nil, err
 	}
 	pricingSvc, promoSvc, invSvc := stockPricingStack(conn, catalogSvc, taxSvc, branchSvc)
+	customerSvc := customers.NewService(customers.NewRepo(conn))
+	salesSvc := sales.NewService(conn, sales.NewRepo(conn), catalogSvc, pricingSvc, promoSvc, invSvc, customerSvc)
 	posSvc := pos.NewService(conn, pos.NewRepo(conn))
+	posSvc.BindSales(salesSvc)
 	userSvc := users.NewUserService(userRepo, params, users.Deps{
 		Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc,
 	})
@@ -148,10 +155,12 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 			Tenants: tenantSvc, Types: btSvc, Profile: btSvc, Plans: planSvc, Subs: planSvc,
 			Mods: registrySvc, Branch: branchSvc, Admins: userSvc, Prefs: settingsStore, Term: terminalSvc,
 		})),
-		Roles:   roles.NewHandler(roleSvc, auditW),
-		Modules: registry.NewHandler(registrySvc, tenantSvc, auditW),
-		POS:     pos.NewHandler(posSvc, registrySvc),
-		POSSvc:  posSvc,
+		Roles:     roles.NewHandler(roleSvc, auditW),
+		Modules:   registry.NewHandler(registrySvc, tenantSvc, auditW),
+		POS:       pos.NewHandler(posSvc, registrySvc),
+		POSSvc:    posSvc,
+		Customers: customers.NewHandler(customerSvc),
+		Sales:     sales.NewHandler(salesSvc, branchSvc),
 	}, nil
 }
 

@@ -1,16 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Toaster, toast } from '@mauzo/ui';
-  import {
-    desktop,
-    type ActivateResult,
-    type Cashier,
-    type Session,
-    type Status,
-    type TerminalInfo,
-    type POSLayout,
-  } from './lib/desktop';
+  import { Toaster } from '@mauzo/ui';
+  import { desktop, type ActivateResult, type Cashier, type Session } from './lib/desktop';
   import { cart } from './lib/cart.svelte';
+  import { pulse } from './lib/pulse.svelte';
   import { createScanner } from './lib/scanner';
   import { posKeydown } from './lib/keys';
   import TopBar from './lib/components/TopBar.svelte';
@@ -28,19 +21,16 @@
 
   const bridge = desktop();
   let screen = $state<Screen>('boot');
-  let info = $state<TerminalInfo | null>(null);
-  let status = $state<Status | null>(null);
   let session = $state<Session | null>(null);
   let picking = $state<Cashier | null>(null);
   let pinError = $state('');
   let pinBusy = $state(false);
   let locked = $state(false);
-  let method = $state<'cash' | 'mpesa' | 'card' | 'other'>('cash');
+  let method = $state<'cash' | 'card' | 'bank' | 'credit'>('cash');
   let now = $state(new Date());
   let modals = $state<Modals | null>(null);
   let productArea = $state<ProductArea | null>(null);
   let currency = $state('KSh');
-  let layout = $state<POSLayout | null>(null);
 
   // ---- boot ----------------------------------------------------------------
 
@@ -51,8 +41,11 @@
       return () => clearInterval(clock);
     }
     void boot();
-    const poll = setInterval(refreshStatus, 15_000);
+    const poll = setInterval(() => void pulse.refresh(), 15_000);
     const idle = setInterval(checkIdle, 5_000);
+    // Heartbeat keeps the back office's online flag fresh; a successful beat
+    // is also the trigger to flush queued offline sales.
+    const beat = setInterval(() => void pulse.heartbeat(), 60_000);
     const reset = () => (lastActivity = Date.now());
     window.addEventListener('pointerdown', reset);
     window.addEventListener('keydown', reset);
@@ -60,19 +53,20 @@
       clearInterval(clock);
       clearInterval(poll);
       clearInterval(idle);
+      clearInterval(beat);
       window.removeEventListener('pointerdown', reset);
       window.removeEventListener('keydown', reset);
     };
   });
 
   async function boot() {
-    info = await bridge!.Info();
-    if (!info.activated) {
+    pulse.info = await bridge!.Info();
+    if (!pulse.info.activated) {
       screen = 'activate';
       return;
     }
-    await refreshStatus();
-    layout = await bridge!.Layout().catch(() => null);
+    await pulse.refresh();
+    await pulse.loadLayout();
     session = await bridge!.CurrentSession();
     if (session) {
       screen = 'checkout';
@@ -80,11 +74,6 @@
     } else {
       screen = 'login';
     }
-  }
-
-  async function refreshStatus() {
-    if (!bridge) return;
-    status = await bridge.Status();
   }
 
   // ---- auto-lock -------------------------------------------------------------
@@ -102,9 +91,9 @@
   // ---- activation → login → checkout ------------------------------------------
 
   function onActivated(r: ActivateResult) {
-    info = {
-      version: info?.version ?? '',
-      api_base_url: info?.api_base_url ?? '',
+    pulse.info = {
+      version: pulse.info?.version ?? '',
+      api_base_url: pulse.info?.api_base_url ?? '',
       activated: true,
       terminal: r.terminal.name,
       branch: r.terminal.branch,
@@ -205,34 +194,6 @@
         break;
     }
   }
-
-  async function doHold(label: string) {
-    if (!bridge || cart.count === 0) return;
-    try {
-      await bridge.Hold(label, cart.payload());
-      await cart.clear();
-      toast.success('Sale parked.');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not hold sale');
-    }
-  }
-
-  async function onPaid() {
-    await cart.clear();
-    toast.success('Sale complete.');
-    void refreshStatus();
-  }
-
-  async function doSync() {
-    if (!bridge) return;
-    const r = await bridge.Sync();
-    if (r.ok) {
-      toast.success(`Synced ${r.products} products, ${r.cashiers} cashiers.`);
-      await refreshStatus();
-    } else {
-      toast.error(r.error ?? 'Sync failed');
-    }
-  }
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -264,17 +225,17 @@
 {:else if screen === 'checkout' && session}
   <div class="pos">
     <TopBar
-      {info}
+      info={pulse.info}
       {session}
-      {status}
+      status={pulse.status}
       {now}
-      onsync={doSync}
+      onsync={() => void pulse.sync()}
       onsettings={() => (screen = 'settings')}
       onlock={lock}
     />
     <div class="body">
       <CartPanel {currency} />
-      <ProductArea bind:this={productArea} {currency} {layout} />
+      <ProductArea bind:this={productArea} {currency} layout={pulse.layout} />
     </div>
     <ActionBar {currency} bind:method onaction={action} />
   </div>
@@ -282,10 +243,10 @@
     bind:this={modals}
     {currency}
     {method}
-    onpaid={onPaid}
-    onhold={doHold}
+    onpaid={(r) => void pulse.paid(r)}
+    onhold={(l) => void pulse.hold(l)}
     onlock={lock}
-    onsync={doSync}
+    onsync={() => void pulse.sync()}
     onswitch={switchCashier}
   />
   {#if locked}

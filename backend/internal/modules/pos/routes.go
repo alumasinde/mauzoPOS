@@ -36,6 +36,9 @@ func PublicRoutes(r chi.Router, h *Handler) {
 // DeviceRoutes mounts endpoints behind device-token auth.
 func DeviceRoutes(r chi.Router, h *Handler) {
 	r.Get("/whoami", h.Whoami)
+	r.Post("/heartbeat", h.Heartbeat)
+	r.Post("/sales", h.Sale)
+	r.Get("/sales/{ref}", h.SaleLookup)
 	r.Get("/sync", h.Sync)
 	r.Post("/signin", h.SignIn)
 	r.Post("/authorize", h.Authorize)

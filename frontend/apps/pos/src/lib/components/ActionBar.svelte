@@ -2,7 +2,7 @@
   import { cart } from '../cart.svelte';
   import { formatMoney } from '../money';
 
-  type Method = 'cash' | 'mpesa' | 'card' | 'other';
+  type Method = 'cash' | 'card' | 'bank' | 'credit';
   let {
     currency = 'KSh',
     method = $bindable<Method>('cash'),
@@ -15,9 +15,9 @@
 
   const methods: { key: Method; label: string; icon: string }[] = [
     { key: 'cash', label: 'Cash', icon: '💵' },
-    { key: 'mpesa', label: 'M-Pesa', icon: '📱' },
     { key: 'card', label: 'Card', icon: '💳' },
-    { key: 'other', label: 'Other', icon: '•••' },
+    { key: 'bank', label: 'Bank', icon: '🏦' },
+    { key: 'credit', label: 'Credit', icon: '📒' },
   ];
 </script>
 

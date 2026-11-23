@@ -21,6 +21,7 @@ type SyncBundle struct {
 	Promotions   []SyncPromotion   `json:"promotions"`
 	PromoTargets []SyncPromoTarget `json:"promotion_targets"`
 	Cashiers     []Cashier         `json:"cashiers"`
+	Customers    []SyncCustomer    `json:"customers"`
 	Settings     []SyncSetting     `json:"settings"`
 	Modules      []string          `json:"modules"`
 }
@@ -32,6 +33,7 @@ type Cashier struct {
 	RoleName    string   `json:"role_name"`
 	PINHash     *string  `json:"pin_hash"`
 	Permissions []string `json:"permissions"`
+	MaxDiscount *string  `json:"max_discount_percent"`
 }
 
 // ModuleLister resolves effective module codes for the tenant.
@@ -72,6 +74,9 @@ func (s *Service) Sync(ctx context.Context, d Device, since time.Time, modules M
 	if b.PromoTargets, err = s.repo.PromoTargets(ctx, d.TenantID, now); err != nil {
 		return b, err
 	}
+	if b.Customers, err = s.repo.Customers(ctx, d.TenantID); err != nil {
+		return b, err
+	}
 	cashiers, err := s.repo.Cashiers(ctx, d.TenantID)
 	if err != nil {
 		return b, err
@@ -96,7 +101,7 @@ func (s *Service) Sync(ctx context.Context, d Device, since time.Time, modules M
 		}
 		b.Cashiers = append(b.Cashiers, Cashier{
 			ID: c.PublicID, Name: c.Name, RoleName: c.RoleName,
-			PINHash: c.PINHash, Permissions: perms[c.ID],
+			PINHash: c.PINHash, Permissions: perms[c.ID], MaxDiscount: c.MaxDiscount,
 		})
 	}
 	if b.Settings, err = s.repo.TenantSettings(ctx, d.TenantID); err != nil {

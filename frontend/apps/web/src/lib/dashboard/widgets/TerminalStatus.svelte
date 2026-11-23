@@ -9,16 +9,24 @@
 
   let { widget }: WidgetProps = $props();
 
-  // Registration state today; live online/offline arrives with the POS
-  // heartbeat (Phase 6), which will feed the same widget.
   let terminals = $state<PosTerminal[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
-  const active = $derived(terminals.filter((t) => t.status === 'active'));
+  const activated = $derived(terminals.filter((t) => t.status === 'active'));
+  const online = $derived(activated.filter((t) => t.online));
   const attention = $derived(terminals.filter((t) => t.status !== 'active'));
 
-  const LABEL = { active: 'Active', pending: 'Not activated', disabled: 'Disabled' } as const;
+  function label(t: PosTerminal): string {
+    if (t.status === 'pending') return 'Not activated';
+    if (t.status === 'disabled') return 'Disabled';
+    return t.online ? 'Online' : 'Offline';
+  }
+  function tone(t: PosTerminal): string {
+    if (t.status === 'pending') return 'pending';
+    if (t.status === 'disabled') return 'disabled';
+    return t.online ? 'active' : 'offline';
+  }
 
   onMount(async () => {
     try {
@@ -40,8 +48,8 @@
   {:else}
     <div class="counts">
       <div class="count">
-        <span class="circle ok"><Icon name="check" size={22} strokeWidth={2.6} /></span>
-        <span><strong>{active.length}</strong><small>Active</small></span>
+        <span class="circle ok"><Icon name="plug" size={22} strokeWidth={2.4} /></span>
+        <span><strong>{online.length}</strong><small>Online now</small></span>
       </div>
       <div class="count">
         <span class="circle warn"><Icon name="clock" size={22} strokeWidth={2.2} /></span>
@@ -52,8 +60,8 @@
       {#each terminals.slice(0, 4) as t (t.id)}
         <li>
           <span class="name">{t.name}</span>
-          <span class="bar {t.status}"></span>
-          <span class="st {t.status}">{LABEL[t.status]}</span>
+          <span class="bar {tone(t)}"></span>
+          <span class="st {tone(t)}">{label(t)}</span>
         </li>
       {/each}
     </ul>
@@ -125,6 +133,9 @@
   .bar.active {
     background: var(--color-success);
   }
+  .bar.offline {
+    background: var(--color-neutral);
+  }
   .bar.pending {
     background: var(--color-warning);
   }
@@ -134,6 +145,9 @@
   }
   .st.active {
     color: var(--color-success);
+  }
+  .st.offline {
+    color: var(--color-text-muted);
   }
   .st.pending {
     color: var(--color-warning);

@@ -6,12 +6,14 @@
     onsync,
     onswitch,
     onheld,
+    onlookup,
   }: {
     onclose: () => void;
     onlock: () => void;
     onsync: () => void;
     onswitch: () => void;
     onheld: () => void;
+    onlookup: () => void;
   } = $props();
 
   function run(fn: () => void) {
@@ -29,6 +31,7 @@
     <button class="btn" onclick={run(onswitch)}>👤<span>Switch cashier</span></button>
     <button class="btn" onclick={run(onlock)}>🔒<span>Lock till</span></button>
     <button class="btn" onclick={onheld}>⏸<span>Held sales</span></button>
+    <button class="btn" onclick={onlookup}>🔎<span>Find sale</span></button>
   </div>
   <button class="ghost" onclick={onclose}>Close</button>
 </div>
