@@ -11,9 +11,15 @@ import (
 
 	"mauzo/internal/core/db"
 	"mauzo/internal/core/httpx"
+	"mauzo/internal/core/identity"
 	"mauzo/internal/core/security"
 	"mauzo/pkg/barcode"
 )
+
+// PriceWatcher records a price change (the pricing module plugs in for
+// price_history). Called inside the update transaction.
+type PriceWatcher func(ctx context.Context, q db.Querier, tenantID, productID, variantID uint64,
+	oldPrice *decimal.Decimal, newPrice decimal.Decimal, actorID uint64) error
 
 // Service owns product business rules: validation, child rows (variants,
 // barcodes, components, images) and the POS lookup.
@@ -24,7 +30,11 @@ type Service struct {
 	scale   barcode.ScaleConfig
 	images  ImageStore
 	publics map[uint64]string // public-id cache for child rows (per service)
+	prices  PriceWatcher      // optional price-change hook
 }
+
+// WatchPrices registers the price-change hook (pricing module).
+func (s *Service) WatchPrices(w PriceWatcher) { s.prices = w }
 
 // NewService builds a Service.
 func NewService(conn *sqlx.DB, repo *ProductRepo, tax *TaxonomyRepo, images ImageStore) *Service {
@@ -137,6 +147,10 @@ func (s *Service) Update(ctx context.Context, tenantID uint64, publicID string, 
 	if err != nil {
 		return Product{}, err
 	}
+	oldVars, err := s.repo.VariantsOf(ctx, existing.ID)
+	if err != nil {
+		return Product{}, err
+	}
 	p.ID = existing.ID
 	p.TenantID = tenantID
 	p.PublicID = existing.PublicID
@@ -170,12 +184,60 @@ func (s *Service) Update(ctx context.Context, tenantID uint64, publicID string, 
 		if err := s.repo.ReplaceBarcodes(ctx, tx, tenantID, p.ID, bs); err != nil {
 			return err
 		}
-		return s.repo.ReplaceComponents(ctx, tx, p.ID, cs)
+		if err := s.repo.ReplaceComponents(ctx, tx, p.ID, cs); err != nil {
+			return err
+		}
+		return s.recordPriceChanges(ctx, tx, tenantID, existing, oldVars, p, variants)
 	})
 	if err != nil {
 		return Product{}, mapWriteErr(err)
 	}
 	return s.Get(ctx, tenantID, publicID)
+}
+
+// recordPriceChanges invokes the price watcher for base/variant prices that
+// changed in this update. Variants match old↔new by name (rows are
+// replaced wholesale, so identity survives as the business key).
+func (s *Service) recordPriceChanges(ctx context.Context, q db.Querier, tenantID uint64,
+	existing Product, oldVars []Variant, p Product, newVars []Variant) error {
+	if s.prices == nil {
+		return nil
+	}
+	var actorID uint64
+	if a, ok := identity.ActorFrom(ctx); ok {
+		actorID = a.ID
+	}
+	if !existing.Price.Equal(p.Price) {
+		old := existing.Price
+		if err := s.prices(ctx, q, tenantID, p.ID, 0, &old, p.Price, actorID); err != nil {
+			return err
+		}
+	}
+	oldByName := map[string]Variant{}
+	for _, v := range oldVars {
+		oldByName[v.Name] = v
+	}
+	for _, nv := range newVars {
+		ov, ok := oldByName[nv.Name]
+		if !ok {
+			if nv.Price != nil {
+				if err := s.prices(ctx, q, tenantID, p.ID, nv.ID, nil, *nv.Price, actorID); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		switch {
+		case ov.Price == nil && nv.Price == nil:
+		case ov.Price == nil || nv.Price == nil || !ov.Price.Equal(*nv.Price):
+			if nv.Price != nil {
+				if err := s.prices(ctx, q, tenantID, p.ID, nv.ID, ov.Price, *nv.Price, actorID); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Archive soft-deletes a product.

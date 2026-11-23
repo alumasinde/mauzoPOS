@@ -212,3 +212,5 @@ export interface OnboardingState {
 
 export * from './phase3';
 export * from './catalog';
+export * from './inventory';
+export * from './pricing';

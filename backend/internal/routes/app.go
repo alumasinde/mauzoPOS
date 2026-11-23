@@ -18,7 +18,9 @@ import (
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
 	"mauzo/internal/modules/catalog"
+	"mauzo/internal/modules/inventory"
 	"mauzo/internal/modules/onboarding"
+	"mauzo/internal/modules/pricing"
 	"mauzo/internal/modules/registry"
 	"mauzo/internal/modules/roles"
 	"mauzo/internal/modules/settings"
@@ -87,6 +89,8 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 		branches.TenantRoutes(r, c.Branches)
 		terminals.TenantRoutes(r, c.Terminals)
 		catalog.TenantRoutes(r, c.Catalog, c.CatalogTax)
+		inventory.TenantRoutes(r, c.Inventory, c.InventoryDocs)
+		pricing.TenantRoutes(r, c.Pricing)
 		onboarding.TenantRoutes(r, c.Onboarding)
 	})
 }

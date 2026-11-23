@@ -20,8 +20,8 @@ column is ✅ and docs are updated).
 | 1 | Platform foundation, tenants & authentication | ✅ |
 | 2 | Business profiles & onboarding | ✅ |
 | 3 | Module registry & permissions | ✅ (platform modules UI not yet clicked through) |
-| 4 | Products, categories & barcodes | ⬜ |
-| 5 | Inventory & pricing | ⬜ |
+| 4 | Products, categories & barcodes | ✅ |
+| 5 | Inventory & pricing | ✅ |
 | 6 | POS desktop & checkout | ⬜ |
 | 7 | Sales & payments | ⬜ |
 | 8 | Receipt printing & designer | ⬜ |
@@ -135,20 +135,20 @@ column is ✅ and docs are updated).
 
 | Feature | DB | API | UI | Tests | Status |
 |---|---|---|---|---|---|
-| Stock locations per branch | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Stock movement ledger (only way to change stock) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Stock balances (per branch / location) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Stock adjustments (reason codes, approval) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Stock transfers between branches | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Stocktaking / cycle counts | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Batch & expiry tracking + expiry alerts | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Wastage | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Reorder levels + low-stock alerts | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Inventory valuation (weighted average cost) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Price lists (per branch / customer group) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Bulk / tiered pricing | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Promotions engine (`pkg/pricecalc`) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Price change history + audit | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Stock locations per branch | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Stock movement ledger (only way to change stock) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Stock balances (per branch / location) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Stock adjustments (reason codes, approval) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Stock transfers between branches | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Stocktaking / cycle counts | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Batch & expiry tracking + expiry alerts | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wastage | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Reorder levels + low-stock alerts | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Inventory valuation (weighted average cost) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Price lists (per branch / customer group) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Bulk / tiered pricing | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Promotions engine (`pkg/pricecalc`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Price change history + audit | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ## Phase 6 — POS desktop & checkout
 
@@ -337,3 +337,4 @@ column is ✅ and docs are updated).
 | 2026-11-23 | Phase 3: module registry (`core/modules`: deps, config schemas, nav; `modules` + `tenant_modules.source`; effective = core ∪ enabled ∩ plan ∩ platform-active, dependency closure, cascade disable, plan downgrade hides). Permission metadata + `permissions` table synced at boot (guarded by `registerall`). Tenant roles + `role_permissions`, 7 templates that auto-follow until customised, locked owner, no-escalation everywhere. Employees CRUD with role, branch access (`user_branches`), PIN (argon2id), seat limit, last-owner/self guards, session revoke. `Can()` = module + permission, `RequireModule`, `BranchScope` (`X-Branch-Id`); `RequireUserRole` removed. `/me` returns permissions/modules; `GET /t/navigation`. Web: dynamic sidebar, Employees, Roles (permission picker), Modules (config forms); platform: Modules page + per-tenant overrides. Migrations 00009 (RBAC) + 00010 (Go backfill: system roles, `users.role` → `role_id`) validated up/down on `mauzo_test`, **not yet applied to dev**. Also fixed: 15 handlers ignoring JSON decode errors, onboarding admin-step role escalation, apps crashing on load (`auth.ts` used `$state` → `auth.svelte.ts`), lockout prune O(n²). ADR 0001. All Go tests pass; svelte-check/eslint/prettier clean. |
 
 | 2026-11-23 | Phase 4: `pkg/barcode` (EAN-8/13, UPC-A check digits, reserved-prefix weighted-label parsing, Code128 encoder for label sheets). Migration 00011: categories (parent tree), brands, units+conversions (kind, base, factor), products (kind/sell_by/track_stock/vat/deposit/attributes JSON), variants, product_barcodes (code+variant+pack_qty unique per tenant), components, images. `modules/catalog`: taxonomy CRUD; product CRUD in transactions with child-row replace; business rules enforced (services can't stock-track/weight-sell, weight→mass units only, composites need non-composite components, no self/cycles, tenant-scoped barcode uniqueness incl. variants/pack codes); lookup by barcode/SKU/weighted scale label; local image store (`STORAGE_LOCAL_PATH`) + upload/serve/delete; CSV+XLSX (excelize) import/export sharing one record pipeline — upsert by SKU, auto-create category/brand, per-row errors; label-sheet endpoint with Code128 patterns. Web: `/catalog` (list/search/filter/archive, import/export CSV+XLSX, label print), `/catalog/taxonomy`, `/catalog/labels`, reusable `ProductForm` + `RowSection`/`UnitsPanel`/`ProductActions`/`transfer.ts`; dynamic nav via module registry. Integration test covers taxonomy/products/weighted/variants/composite/pack barcodes/lookup/import-export/images; live-verified end-to-end on demo tenant. `golangci-lint` 0 issues, `go test ./...` green, svelte-check/eslint/prettier clean, `pnpm -r build` green. |
+| 2026-11-24 | Phase 5: migration 00012 — stock_locations, product_batches, append-only stock_movements ledger, stock_balances (derived in-tx), adjustments+items, transfers+items (public item ids), counts+items, reorder_levels, price_lists+items, promotions+targets, price_history. `pkg/pricecalc`: percent/amount/buy-X-get-Y promos, product/category targets, date+time+weekday windows, deterministic best-per-line (max discount → priority → id). `modules/inventory`: receive/wastage/auto-provisioned first location, optional batches+expiry, weighted-avg cost on inbound, FEFO batch allocation on outbound, balances/movements/filters, batch+expiry alerts, reorder+low-stock, branch valuation; adjustments draft→approve→post with self-approval guard; transfers draft→sent→received carrying source avg cost; stocktakes create→count→post/cancel with variance lines. `modules/pricing`: price lists (scope/branch/customer group/priority/validity) + min-qty tiers, promotions CRUD, quote endpoint (tier resolution + promo application), price_history hook inside catalog product update tx (variants matched by name). Permissions per docs/permissions.md; role templates auto-follow via wildcards. Web: `/inventory` (stock/movements/reorders/valuation, receive+wastage modals, expiry banner, low-stock filter), `/inventory/documents` (adjustments/transfers/counts panels), `/pricing` + `/pricing/promotions` + `/pricing/history`; routes whitelisted in layout; nav entries in module catalogue. Integration tests for ledger/documents/FEFO/alerts/valuation + tiers/promos/quote/history; live-verified on demo tenant (receive→waste→adjust→transfer→count→FEFO→reorder→valuation; quote 65→50 tier→45 promo, subtotal 2400/discount 60/total 2340; history 900→950). All checks green. |

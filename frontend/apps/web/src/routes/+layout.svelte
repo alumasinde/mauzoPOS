@@ -12,7 +12,23 @@
 
   // Pages this app ships. Server nav entries for anything else are ignored,
   // so a module can never link to a screen that does not exist yet.
-  const ROUTES = ['/', '/onboarding', '/modules', '/settings', '/audit', '/employees', '/roles'] as const;
+  const ROUTES = [
+    '/',
+    '/onboarding',
+    '/modules',
+    '/settings',
+    '/audit',
+    '/employees',
+    '/roles',
+    '/catalog',
+    '/catalog/taxonomy',
+    '/catalog/labels',
+    '/inventory',
+    '/inventory/documents',
+    '/pricing',
+    '/pricing/promotions',
+    '/pricing/history',
+  ] as const;
   type AppRoute = (typeof ROUTES)[number];
   const isRoute = (p: string): p is AppRoute => (ROUTES as readonly string[]).includes(p);
 

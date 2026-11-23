@@ -20,7 +20,9 @@ import (
 	"mauzo/internal/modules/branches"
 	"mauzo/internal/modules/businesstypes"
 	"mauzo/internal/modules/catalog"
+	"mauzo/internal/modules/inventory"
 	"mauzo/internal/modules/onboarding"
+	"mauzo/internal/modules/pricing"
 	_ "mauzo/internal/modules/registerall" // complete permission registry
 	"mauzo/internal/modules/registry"
 	"mauzo/internal/modules/roles"
@@ -63,6 +65,9 @@ type Container struct {
 	Terminals     *terminals.Handler
 	Catalog       *catalog.Handler
 	CatalogTax    *catalog.TaxonomyHandler
+	Inventory     *inventory.Handler
+	InventoryDocs *inventory.DocsHandler
+	Pricing       *pricing.Handler
 	Onboarding    *onboarding.Handler
 	Roles         *roles.Handler
 	Modules       *registry.Handler
@@ -113,12 +118,9 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	pricingSvc, promoSvc, invSvc := stockPricingStack(conn, catalogSvc, taxSvc, branchSvc)
 	userSvc := users.NewUserService(userRepo, params, users.Deps{
 		Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc,
-	})
-	onbSvc := onboarding.NewService(onboarding.Deps{
-		Tenants: tenantSvc, Types: btSvc, Profile: btSvc, Plans: planSvc, Subs: planSvc,
-		Mods: registrySvc, Branch: branchSvc, Admins: userSvc, Prefs: settingsStore, Term: terminalSvc,
 	})
 
 	return &Container{
@@ -145,9 +147,15 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Terminals:     terminals.NewHandler(terminalSvc),
 		Catalog:       catalog.NewHandler(catalogSvc, taxSvc),
 		CatalogTax:    catalog.NewTaxonomyHandler(taxSvc),
-		Onboarding:    onboarding.NewHandler(onbSvc),
-		Roles:         roles.NewHandler(roleSvc, auditW),
-		Modules:       registry.NewHandler(registrySvc, tenantSvc, auditW),
+		Inventory:     inventory.NewHandler(invSvc),
+		InventoryDocs: inventory.NewDocsHandler(invSvc),
+		Pricing:       pricing.NewHandler(pricingSvc, promoSvc, branchSvc),
+		Onboarding: onboarding.NewHandler(onboarding.NewService(onboarding.Deps{
+			Tenants: tenantSvc, Types: btSvc, Profile: btSvc, Plans: planSvc, Subs: planSvc,
+			Mods: registrySvc, Branch: branchSvc, Admins: userSvc, Prefs: settingsStore, Term: terminalSvc,
+		})),
+		Roles:   roles.NewHandler(roleSvc, auditW),
+		Modules: registry.NewHandler(registrySvc, tenantSvc, auditW),
 	}, nil
 }
 
@@ -176,6 +184,19 @@ func catalogStack(conn *sqlx.DB, cfg config.Config) (*catalog.Service, *catalog.
 	taxRepo := catalog.NewTaxonomyRepo(conn)
 	return catalog.NewService(conn, catalog.NewProductRepo(conn), taxRepo, imageStore),
 		catalog.NewTaxonomyService(taxRepo), nil
+}
+
+// stockPricingStack builds the inventory + pricing services (kept out of
+// NewContainer for readability).
+func stockPricingStack(conn *sqlx.DB, catalogSvc *catalog.Service, taxSvc *catalog.TaxonomyService,
+	branchSvc *branches.Service) (*pricing.Service, *pricing.PromoService, *inventory.Service) {
+	repo := pricing.NewRepo(conn)
+	pricingSvc := pricing.NewService(conn, repo, catalogSvc, branchSvc)
+	promoSvc := pricing.NewPromoService(conn, repo, catalogSvc, taxSvc)
+	catalogSvc.WatchPrices(pricingSvc.RecordPrice)
+	invSvc := inventory.NewService(conn, inventory.NewRepo(conn),
+		inventory.NewDocsRepo(conn), catalogSvc, branchSvc)
+	return pricingSvc, promoSvc, invSvc
 }
 
 // Close releases container resources (the database pool).
