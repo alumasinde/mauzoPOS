@@ -95,7 +95,9 @@ func profileID(t *testing.T, conn *sqlx.DB) string {
 	t.Helper()
 	var id string
 	if err := conn.GetContext(context.Background(), &id,
-		`SELECT public_id FROM business_profiles LIMIT 1`); err != nil {
+		`SELECT p.public_id FROM business_profiles p
+		 JOIN business_types t ON t.id = p.business_type_id
+		 WHERE t.code = 'butchery' ORDER BY p.id LIMIT 1`); err != nil {
 		t.Fatal(err)
 	}
 	return id

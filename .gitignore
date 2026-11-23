@@ -39,3 +39,4 @@ frontend/apps/pos/src/wailsjs/
 # Local tool config
 .claude/settings.local.json
 backend/bin/
+frontend/apps/*/package.json.md5

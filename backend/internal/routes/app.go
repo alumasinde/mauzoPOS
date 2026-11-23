@@ -21,6 +21,7 @@ import (
 	"mauzo/internal/modules/dashboard"
 	"mauzo/internal/modules/inventory"
 	"mauzo/internal/modules/onboarding"
+	"mauzo/internal/modules/pos"
 	"mauzo/internal/modules/pricing"
 	"mauzo/internal/modules/registry"
 	"mauzo/internal/modules/roles"
@@ -97,8 +98,15 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 	})
 }
 
-// posRoutes: terminal + cashier auth context (Phase 6+).
-func posRoutes(_ chi.Router, _ *app.Container) {}
+// posRoutes: device-token auth context. POST /pos/activate is public but
+// one-time-code guarded; everything else needs the terminal bearer token.
+func posRoutes(r chi.Router, c *app.Container) {
+	pos.PublicRoutes(r, c.POS)
+	r.Group(func(r chi.Router) {
+		r.Use(pos.DeviceAuth(c.POSSvc))
+		pos.DeviceRoutes(r, c.POS)
+	})
+}
 
 // webhookRoutes: provider callbacks — M-Pesa, eTIMS (Phase 9+).
 func webhookRoutes(_ chi.Router, _ *app.Container) {}

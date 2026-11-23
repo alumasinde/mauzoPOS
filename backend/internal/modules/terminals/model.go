@@ -13,12 +13,15 @@ const (
 
 // Terminal is one POS device registration at a branch.
 type Terminal struct {
-	ID        uint64    `db:"id"`
-	TenantID  uint64    `db:"tenant_id"`
-	BranchID  uint64    `db:"branch_id"`
-	PublicID  string    `db:"public_id"`
-	Name      string    `db:"name"`
-	Status    string    `db:"status"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	ID          uint64     `db:"id"`
+	TenantID    uint64     `db:"tenant_id"`
+	BranchID    uint64     `db:"branch_id"`
+	PublicID    string     `db:"public_id"`
+	Name        string     `db:"name"`
+	Status      string     `db:"status"`
+	DeviceName  *string    `db:"device_name"`
+	ActivatedAt *time.Time `db:"activated_at"`
+	LastSeenAt  *time.Time `db:"last_seen_at"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   time.Time  `db:"updated_at"`
 }

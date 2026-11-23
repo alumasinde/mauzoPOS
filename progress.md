@@ -22,7 +22,7 @@ column is ✅ and docs are updated).
 | 3 | Module registry & permissions | ✅ (platform modules UI not yet clicked through) |
 | 4 | Products, categories & barcodes | ✅ |
 | 5 | Inventory & pricing | ✅ |
-| 6 | POS desktop & checkout | ⬜ |
+| 6 | POS desktop & checkout | ✅ |
 | 7 | Sales & payments | ⬜ |
 | 8 | Receipt printing & designer | ⬜ |
 | 9 | M-Pesa integrations | ⬜ |
@@ -154,25 +154,25 @@ column is ✅ and docs are updated).
 
 | Feature | DB | API | UI | Tests | Status |
 |---|---|---|---|---|---|
-| Terminal registration & activation (device identity, licence) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Local SQLite schema (`desktop/localdb`) | ⬜ | ➖ | ➖ | ⬜ | ⬜ |
-| Initial catalog / price / tax / cashier download | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Cashier selection + PIN login (argon2id, lockout) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Auto-lock + cashier switching | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Supervisor PIN authorization | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Checkout screen layout (per reference image) | ➖ | ➖ | ⬜ | ⬜ | ⬜ |
-| Persistent scanner focus + HID scanner handling | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Barcode lookup (local) + auto add / qty increment | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Unknown barcode handling | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Weighted / price-embedded barcode parsing | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Product search + category tiles | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Cart: qty, remove, line discount | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Price check (F6) | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Hold sale (F5) / recall held sales | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Keyboard shortcuts (Esc, F5–F10) | ➖ | ➖ | ⬜ | ⬜ | ⬜ |
-| Business-type adaptive POS layout | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Online / offline / printer status indicators | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Terminal settings screen | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Terminal registration & activation (device identity, licence) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Local SQLite schema (`desktop/localdb`) | ✅ | ➖ | ➖ | ✅ | ✅ |
+| Initial catalog / price / tax / cashier download | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Cashier selection + PIN login (argon2id, lockout) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Auto-lock + cashier switching | ➖ | ➖ | ✅ | ➖ | ✅ |
+| Supervisor PIN authorization | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Checkout screen layout (per reference image) | ➖ | ➖ | ✅ | ➖ | ✅ |
+| Persistent scanner focus + HID scanner handling | ➖ | ✅ | ✅ | ➖ | ✅ |
+| Barcode lookup (local) + auto add / qty increment | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Unknown barcode handling | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Weighted / price-embedded barcode parsing | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Product search + category tiles | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Cart: qty, remove, line discount | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Price check (F6) | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Hold sale (F5) / recall held sales | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Keyboard shortcuts (Esc, F5–F10) | ➖ | ➖ | ✅ | ➖ | ✅ |
+| Business-type adaptive POS layout | ✅ | ✅ | ✅ | ➖ | ✅ |
+| Online / offline / printer status indicators | ➖ | ✅ | ✅ | ➖ | ✅ |
+| Terminal settings screen | ➖ | ✅ | ✅ | ➖ | ✅ |
 
 ## Phase 7 — Sales & payments
 
@@ -341,5 +341,6 @@ column is ✅ and docs are updated).
 | 2026-11-23 | Phase 3: module registry (`core/modules`: deps, config schemas, nav; `modules` + `tenant_modules.source`; effective = core ∪ enabled ∩ plan ∩ platform-active, dependency closure, cascade disable, plan downgrade hides). Permission metadata + `permissions` table synced at boot (guarded by `registerall`). Tenant roles + `role_permissions`, 7 templates that auto-follow until customised, locked owner, no-escalation everywhere. Employees CRUD with role, branch access (`user_branches`), PIN (argon2id), seat limit, last-owner/self guards, session revoke. `Can()` = module + permission, `RequireModule`, `BranchScope` (`X-Branch-Id`); `RequireUserRole` removed. `/me` returns permissions/modules; `GET /t/navigation`. Web: dynamic sidebar, Employees, Roles (permission picker), Modules (config forms); platform: Modules page + per-tenant overrides. Migrations 00009 (RBAC) + 00010 (Go backfill: system roles, `users.role` → `role_id`) validated up/down on `mauzo_test`, **not yet applied to dev**. Also fixed: 15 handlers ignoring JSON decode errors, onboarding admin-step role escalation, apps crashing on load (`auth.ts` used `$state` → `auth.svelte.ts`), lockout prune O(n²). ADR 0001. All Go tests pass; svelte-check/eslint/prettier clean. |
 
 | 2026-11-23 | Phase 4: `pkg/barcode` (EAN-8/13, UPC-A check digits, reserved-prefix weighted-label parsing, Code128 encoder for label sheets). Migration 00011: categories (parent tree), brands, units+conversions (kind, base, factor), products (kind/sell_by/track_stock/vat/deposit/attributes JSON), variants, product_barcodes (code+variant+pack_qty unique per tenant), components, images. `modules/catalog`: taxonomy CRUD; product CRUD in transactions with child-row replace; business rules enforced (services can't stock-track/weight-sell, weight→mass units only, composites need non-composite components, no self/cycles, tenant-scoped barcode uniqueness incl. variants/pack codes); lookup by barcode/SKU/weighted scale label; local image store (`STORAGE_LOCAL_PATH`) + upload/serve/delete; CSV+XLSX (excelize) import/export sharing one record pipeline — upsert by SKU, auto-create category/brand, per-row errors; label-sheet endpoint with Code128 patterns. Web: `/catalog` (list/search/filter/archive, import/export CSV+XLSX, label print), `/catalog/taxonomy`, `/catalog/labels`, reusable `ProductForm` + `RowSection`/`UnitsPanel`/`ProductActions`/`transfer.ts`; dynamic nav via module registry. Integration test covers taxonomy/products/weighted/variants/composite/pack barcodes/lookup/import-export/images; live-verified end-to-end on demo tenant. `golangci-lint` 0 issues, `go test ./...` green, svelte-check/eslint/prettier clean, `pnpm -r build` green. |
+| 2026-11-23 | Phase 6: migration 00013 — pos_terminals device identity (activation code hash, device token hash, device_id/name, last_seen) + held_sales. `modules/pos`: public `/pos/activate` (one-time code → device token), terminal-auth middleware (ActorTerminal), `/pos/sync` bundle (categories, units, products, variants, barcodes, price lists+items, promotions+targets, cashiers+permissions, settings, modules), `/pos/signin` (argon2id PIN), `/pos/authorize` (supervisor override), held-sale CRUD; `/t/terminals/{id}/code` issues activation codes. `desktop/localdb`: SQLite schema + ApplySync + catalog/barcode lookups, price-list/tier/promotion quote engine, cached cashiers (offline VerifyPIN/AuthorizePIN), held carts, pending sales. `desktop/bindings`: activate (device fingerprint), sync, scan (scale label → barcode → SKU), quote, hold/recall, pay → pending sale, PIN login + lockout, supervisor auth (online with offline fallback), settings, status, business-type Layout (profile.pos_layout). POS frontend: activation → sync → cashier select → PIN pad → lock/auto-lock → checkout per reference image — dark navy top bar, cart panel, category tiles + product grid, F5–F10 action bar, pay/held/price-check/qty/discount/supervisor/more/unknown modals, settings screen, online/offline/printer status. Integration tests: activate/replay, device auth, sync bundle, PIN sign-in, supervisor authorize, held lifecycle; localdb tests for sync/lookup/quote/cashiers/held. Live-verified on demo tenant (activate → sync → sign-in → authorize → hold → recall → cancel). Wails build produces MauzoPOS.exe. All checks green. |
 | 2026-11-24 | Phase 5: migration 00012 — stock_locations, product_batches, append-only stock_movements ledger, stock_balances (derived in-tx), adjustments+items, transfers+items (public item ids), counts+items, reorder_levels, price_lists+items, promotions+targets, price_history. `pkg/pricecalc`: percent/amount/buy-X-get-Y promos, product/category targets, date+time+weekday windows, deterministic best-per-line (max discount → priority → id). `modules/inventory`: receive/wastage/auto-provisioned first location, optional batches+expiry, weighted-avg cost on inbound, FEFO batch allocation on outbound, balances/movements/filters, batch+expiry alerts, reorder+low-stock, branch valuation; adjustments draft→approve→post with self-approval guard; transfers draft→sent→received carrying source avg cost; stocktakes create→count→post/cancel with variance lines. `modules/pricing`: price lists (scope/branch/customer group/priority/validity) + min-qty tiers, promotions CRUD, quote endpoint (tier resolution + promo application), price_history hook inside catalog product update tx (variants matched by name). Permissions per docs/permissions.md; role templates auto-follow via wildcards. Web: `/inventory` (stock/movements/reorders/valuation, receive+wastage modals, expiry banner, low-stock filter), `/inventory/documents` (adjustments/transfers/counts panels), `/pricing` + `/pricing/promotions` + `/pricing/history`; routes whitelisted in layout; nav entries in module catalogue. Integration tests for ledger/documents/FEFO/alerts/valuation + tiers/promos/quote/history; live-verified on demo tenant (receive→waste→adjust→transfer→count→FEFO→reorder→valuation; quote 65→50 tier→45 promo, subtotal 2400/discount 60/total 2340; history 900→950). All checks green. |
 | 2026-11-23 | Dashboard shell. Backend: nav entries gained `Section` (`core/modules/sections.go`: Sales, Inventory, Pricing, Purchasing, Payments, Reports, Team & access, Configuration) and the full sidebar from the design is declared up front, including unbuilt pages; modules declare dashboard `Widgets`; `GET /t/dashboard` returns the user's widgets (module enabled × permission); `GET /t/branches/accessible` for the branch picker; `/me` returns `role_name`. Permission files for the pending modules (sales, purchasing — adds `.view` perms, payments, mpesa, reports, receipts) and `registerall` now also links inventory and pricing (they were missing, so `migrate seed` would have synced a partial registry). Web: sidebar + top bar split into `lib/shell`, API client sends the picked branch as `X-Branch-Id`, inventory pages take `?tab=` from the URL and start on the picked branch; UI kit adds `Icon`, `Sparkline`, `AreaChart`, `DonutChart` and navy dark-theme tokens. `AreaChart`/`DonutChart` are unused until the sales/payments widgets plug in. |

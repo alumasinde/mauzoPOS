@@ -3,6 +3,7 @@ package terminals
 import (
 	"context"
 	"strings"
+	"time"
 
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/security"
@@ -38,10 +39,13 @@ type CreateRequest struct {
 
 // Response is the API view of a terminal.
 type Response struct {
-	ID       string `json:"id"`
-	BranchID uint64 `json:"branch_id"`
-	Name     string `json:"name"`
-	Status   string `json:"status"`
+	ID          string     `json:"id"`
+	BranchID    uint64     `json:"branch_id"`
+	Name        string     `json:"name"`
+	Status      string     `json:"status"`
+	DeviceName  *string    `json:"device_name"`
+	ActivatedAt *time.Time `json:"activated_at"`
+	LastSeenAt  *time.Time `json:"last_seen_at"`
 }
 
 // List returns the tenant's terminals.
@@ -85,7 +89,27 @@ func (s *Service) CreateAt(ctx context.Context, tenantID uint64, req CreateReque
 	return t, nil
 }
 
+// IssueCode mints a one-time activation code (returned once, stored hashed).
+func (s *Service) IssueCode(ctx context.Context, tenantID uint64, publicID string) (string, error) {
+	t, err := s.repo.ByPublicID(ctx, tenantID, publicID)
+	if err != nil {
+		return "", ErrInvalidBranch
+	}
+	code, err := security.NewToken()
+	if err != nil {
+		return "", err
+	}
+	code = code[:12] // short enough to read off a screen
+	if err := s.repo.SetActivationCode(ctx, t.ID, ptr(security.HashToken(code))); err != nil {
+		return "", err
+	}
+	return code, nil
+}
+
+func ptr[T any](v T) *T { return &v }
+
 // ToResponse maps a Terminal to its API view.
 func ToResponse(t Terminal) Response {
-	return Response{ID: t.PublicID, BranchID: t.BranchID, Name: t.Name, Status: t.Status}
+	return Response{ID: t.PublicID, BranchID: t.BranchID, Name: t.Name, Status: t.Status,
+		DeviceName: t.DeviceName, ActivatedAt: t.ActivatedAt, LastSeenAt: t.LastSeenAt}
 }

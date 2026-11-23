@@ -1,145 +1,336 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Button, StatusDot, Toaster, toast } from '@mauzo/ui';
-  import { formatDate, formatTime } from '@mauzo/utils';
-  import { desktop, type ServerStatus, type TerminalInfo } from './lib/desktop';
+  import { Toaster, toast } from '@mauzo/ui';
+  import {
+    desktop,
+    type ActivateResult,
+    type Cashier,
+    type Session,
+    type Status,
+    type TerminalInfo,
+    type POSLayout,
+  } from './lib/desktop';
+  import { cart } from './lib/cart.svelte';
+  import { createScanner } from './lib/scanner';
+  import { posKeydown } from './lib/keys';
+  import TopBar from './lib/components/TopBar.svelte';
+  import ActivationScreen from './lib/components/ActivationScreen.svelte';
+  import CashierSelect from './lib/components/CashierSelect.svelte';
+  import PinPad from './lib/components/PinPad.svelte';
+  import CartPanel from './lib/components/CartPanel.svelte';
+  import ProductArea from './lib/components/ProductArea.svelte';
+  import ActionBar from './lib/components/ActionBar.svelte';
+  import Modals from './lib/components/Modals.svelte';
+  import LockScreen from './lib/components/LockScreen.svelte';
+  import SettingsScreen from './lib/components/SettingsScreen.svelte';
+
+  type Screen = 'boot' | 'browser' | 'activate' | 'login' | 'pin' | 'checkout' | 'settings';
 
   const bridge = desktop();
-
-  let now = $state(new Date());
+  let screen = $state<Screen>('boot');
   let info = $state<TerminalInfo | null>(null);
-  let server = $state<ServerStatus | null>(null);
-  let checking = $state(false);
+  let status = $state<Status | null>(null);
+  let session = $state<Session | null>(null);
+  let picking = $state<Cashier | null>(null);
+  let pinError = $state('');
+  let pinBusy = $state(false);
+  let locked = $state(false);
+  let method = $state<'cash' | 'mpesa' | 'card' | 'other'>('cash');
+  let now = $state(new Date());
+  let modals = $state<Modals | null>(null);
+  let productArea = $state<ProductArea | null>(null);
+  let currency = $state('KSh');
+  let layout = $state<POSLayout | null>(null);
 
-  async function checkServer() {
-    if (!bridge) return;
-    checking = true;
-    try {
-      server = await bridge.CheckServer();
-      if (!server.reachable) toast.error(server.error ?? 'Server unreachable');
-    } finally {
-      checking = false;
+  // ---- boot ----------------------------------------------------------------
+
+  onMount(() => {
+    const clock = setInterval(() => (now = new Date()), 1000);
+    if (!bridge) {
+      screen = 'browser';
+      return () => clearInterval(clock);
+    }
+    void boot();
+    const poll = setInterval(refreshStatus, 15_000);
+    const idle = setInterval(checkIdle, 5_000);
+    const reset = () => (lastActivity = Date.now());
+    window.addEventListener('pointerdown', reset);
+    window.addEventListener('keydown', reset);
+    return () => {
+      clearInterval(clock);
+      clearInterval(poll);
+      clearInterval(idle);
+      window.removeEventListener('pointerdown', reset);
+      window.removeEventListener('keydown', reset);
+    };
+  });
+
+  async function boot() {
+    info = await bridge!.Info();
+    if (!info.activated) {
+      screen = 'activate';
+      return;
+    }
+    await refreshStatus();
+    layout = await bridge!.Layout().catch(() => null);
+    session = await bridge!.CurrentSession();
+    if (session) {
+      screen = 'checkout';
+      startScanner();
+    } else {
+      screen = 'login';
     }
   }
 
-  onMount(() => {
-    const tick = setInterval(() => (now = new Date()), 1000);
-    if (bridge) {
-      bridge.Info().then((i) => (info = i));
-      checkServer();
+  async function refreshStatus() {
+    if (!bridge) return;
+    status = await bridge.Status();
+  }
+
+  // ---- auto-lock -------------------------------------------------------------
+
+  let lastActivity = Date.now();
+  let lockAfter = 120;
+  void bridge?.GetSettings().then((s) => (lockAfter = s.auto_lock_seconds));
+
+  function checkIdle() {
+    if (screen === 'checkout' && !locked && Date.now() - lastActivity > lockAfter * 1000) {
+      locked = true;
     }
-    return () => clearInterval(tick);
+  }
+
+  // ---- activation → login → checkout ------------------------------------------
+
+  function onActivated(r: ActivateResult) {
+    info = {
+      version: info?.version ?? '',
+      api_base_url: info?.api_base_url ?? '',
+      activated: true,
+      terminal: r.terminal.name,
+      branch: r.terminal.branch,
+      tenant: r.terminal.tenant,
+      business_type: r.terminal.business_type,
+    };
+    screen = 'login';
+  }
+
+  function pickCashier(c: Cashier) {
+    picking = c;
+    pinError = '';
+    screen = 'pin';
+  }
+
+  async function login(pin: string) {
+    if (!bridge || !picking) return;
+    pinBusy = true;
+    try {
+      session = await bridge.Login(picking.id, pin);
+      locked = false;
+      screen = 'checkout';
+      startScanner();
+    } catch (e) {
+      pinError = e instanceof Error ? e.message : 'Wrong PIN';
+    } finally {
+      pinBusy = false;
+    }
+  }
+
+  async function unlock(pin: string) {
+    await login(pin);
+  }
+
+  function switchCashier() {
+    locked = false;
+    session = null;
+    picking = null;
+    screen = 'login';
+  }
+
+  function lock() {
+    locked = true;
+  }
+
+  // ---- scanner + keys -----------------------------------------------------------
+
+  let scannerOn = false;
+  function startScanner() {
+    if (scannerOn) return;
+    scannerOn = true;
+    const s = createScanner((code) => void onScan(code));
+    s.attach();
+  }
+
+  async function onScan(code: string) {
+    if (screen !== 'checkout' || locked) return;
+    await productArea?.handleCode(code);
+  }
+
+  window.addEventListener('pos:unknown', (e: Event) => {
+    modals?.open('unknown', (e as CustomEvent<string>).detail);
   });
+  window.addEventListener('pos:held', () => modals?.open('held'));
+
+  function onKeydown(e: KeyboardEvent) {
+    if (screen !== 'checkout' || locked) return;
+    posKeydown(e, action);
+  }
+
+  // ---- cart actions ---------------------------------------------------------------
+
+  const can = (p: string) => session?.permissions.includes(p) ?? false;
+  const need = (perm: string, fn: () => void) => (can(perm) ? fn() : modals?.withSupervisor(fn));
+
+  function action(a: string) {
+    switch (a) {
+      case 'cancel':
+        if (cart.count > 0) need('pos.sale.cancel', () => void cart.clear());
+        break;
+      case 'hold':
+        modals?.open('held');
+        break;
+      case 'pricecheck':
+        modals?.open('pricecheck');
+        break;
+      case 'quantity':
+        if (cart.count > 0) modals?.open('quantity');
+        break;
+      case 'discount':
+        if (cart.count > 0) need('pos.discount.apply', () => modals?.open('discount'));
+        break;
+      case 'more':
+        modals?.open('more');
+        break;
+      case 'pay':
+        if (cart.count > 0) modals?.open('pay');
+        break;
+    }
+  }
+
+  async function doHold(label: string) {
+    if (!bridge || cart.count === 0) return;
+    try {
+      await bridge.Hold(label, cart.payload());
+      await cart.clear();
+      toast.success('Sale parked.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not hold sale');
+    }
+  }
+
+  async function onPaid() {
+    await cart.clear();
+    toast.success('Sale complete.');
+    void refreshStatus();
+  }
+
+  async function doSync() {
+    if (!bridge) return;
+    const r = await bridge.Sync();
+    if (r.ok) {
+      toast.success(`Synced ${r.products} products, ${r.cashiers} cashiers.`);
+      await refreshStatus();
+    } else {
+      toast.error(r.error ?? 'Sync failed');
+    }
+  }
 </script>
 
-<header class="topbar">
-  <div class="brand">
-    <strong>Mauzo POS</strong>
-    {#if info}<span class="muted">v{info.version}</span>{/if}
-  </div>
-  <div class="right">
-    {#if server}
-      <StatusDot status={server.reachable ? 'ok' : 'error'} label={server.reachable ? 'Online' : 'Offline'} />
-    {/if}
-    <span>{formatDate(now)} {formatTime(now)}</span>
-  </div>
-</header>
+<svelte:window onkeydown={onKeydown} />
 
-<main>
-  <section class="card">
-    {#if !bridge}
-      <h1>Desktop runtime not detected</h1>
-      <p>
-        This UI is running in a plain browser. Start it with <code>wails dev</code> from
-        <code>backend/desktop</code> to use terminal features.
-      </p>
-    {:else}
-      <h1>{info?.activated ? 'Terminal ready' : 'Terminal not activated'}</h1>
-      <p class="muted">
-        Terminal activation and cashier PIN login arrive in Phase 6. This screen verifies the desktop shell
-        can reach the central API.
-      </p>
-      <dl>
-        <dt>Server</dt>
-        <dd>{info?.api_base_url ?? '—'}</dd>
-        <dt>Status</dt>
-        <dd>
-          {#if server}
-            {server.reachable
-              ? `${server.status} (v${server.version}, ${server.latency_ms} ms)`
-              : server.error}
-          {:else}
-            checking…
-          {/if}
-        </dd>
-      </dl>
-      <Button size="lg" variant="secondary" loading={checking} onclick={checkServer}>Check connection</Button>
-    {/if}
-  </section>
-</main>
+{#if screen === 'boot'}
+  <div class="boot">Starting…</div>
+{:else if screen === 'browser'}
+  <div class="boot">
+    <h1>Desktop runtime not detected</h1>
+    <p>Run <code>wails dev</code> in <code>backend/desktop</code>, or build the terminal .exe.</p>
+  </div>
+{:else if screen === 'activate'}
+  <ActivationScreen onactivated={onActivated} />
+{:else if screen === 'login'}
+  <CashierSelect onpick={pickCashier} />
+{:else if screen === 'pin' && picking}
+  <div class="pinScreen">
+    <PinPad
+      title="Enter your PIN"
+      subtitle={picking.name}
+      error={pinError}
+      busy={pinBusy}
+      onsubmit={login}
+      oncancel={switchCashier}
+    />
+  </div>
+{:else if screen === 'settings'}
+  <SettingsScreen onback={() => (screen = 'checkout')} />
+{:else if screen === 'checkout' && session}
+  <div class="pos">
+    <TopBar
+      {info}
+      {session}
+      {status}
+      {now}
+      onsync={doSync}
+      onsettings={() => (screen = 'settings')}
+      onlock={lock}
+    />
+    <div class="body">
+      <CartPanel {currency} />
+      <ProductArea bind:this={productArea} {currency} {layout} />
+    </div>
+    <ActionBar {currency} bind:method onaction={action} />
+  </div>
+  <Modals
+    bind:this={modals}
+    {currency}
+    {method}
+    onpaid={onPaid}
+    onhold={doHold}
+    onlock={lock}
+    onsync={doSync}
+    onswitch={switchCashier}
+  />
+  {#if locked}
+    <LockScreen {session} error={pinError} busy={pinBusy} onunlock={unlock} onswitch={switchCashier} />
+  {/if}
+{/if}
 
 <Toaster />
 
 <style>
   :global(body) {
+    margin: 0;
     height: 100vh;
     overflow: hidden;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    -webkit-user-select: none;
+    user-select: none;
   }
-  .topbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-3) var(--space-5);
-    background: var(--color-header);
-    color: var(--color-header-text);
-    font-size: var(--text-lg);
-  }
-  .brand {
-    display: flex;
-    gap: var(--space-3);
-    align-items: baseline;
-  }
-  .brand strong {
-    font-size: var(--text-2xl);
-  }
-  .right {
-    display: flex;
-    gap: var(--space-5);
-    align-items: center;
-  }
-  .muted {
-    color: var(--color-text-muted);
-  }
-  .topbar .muted {
-    color: var(--color-header-text);
-    opacity: 0.7;
-  }
-  main {
+  .boot {
     display: grid;
     place-items: center;
-    height: calc(100vh - 64px);
+    height: 100vh;
+    text-align: center;
+    color: var(--color-text-muted, #666);
   }
-  .card {
-    width: min(560px, 92vw);
-    padding: var(--space-6);
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-  }
-  h1 {
-    margin-top: 0;
-  }
-  dl {
+  .pinScreen {
     display: grid;
-    grid-template-columns: 100px 1fr;
-    gap: var(--space-2);
-    margin: var(--space-5) 0;
+    place-items: center;
+    height: 100vh;
+    background: var(--color-surface-muted, #f4f6fa);
   }
-  dt {
-    font-weight: 600;
+  .pos {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
   }
-  dd {
-    margin: 0;
-    word-break: break-all;
+  .body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    min-height: 0;
+  }
+  @media (max-width: 1100px) {
+    .body {
+      grid-template-columns: 340px 1fr;
+    }
   }
 </style>

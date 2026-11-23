@@ -11,5 +11,6 @@ func TenantRoutes(r chi.Router, h *Handler) {
 	r.Route("/terminals", func(r chi.Router) {
 		r.With(mw.Can(PermTerminalView)).Get("/", h.List)
 		r.With(mw.Can(PermTerminalManage)).Post("/", h.Create)
+		r.With(mw.Can(PermTerminalActivate)).Post("/{id}/code", h.IssueCode)
 	})
 }

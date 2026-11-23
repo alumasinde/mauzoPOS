@@ -224,10 +224,13 @@
     font-size: 13px;
   }
   .pill {
-    background: var(--surface-2, #f5f5f4);
+    background: var(--surface-2, #c51b1b);
     border-radius: 99px;
     padding: 2px 10px;
+    color: #f5f5f5;
+    font-weight: 900;
   }
+
   .filters {
     display: flex;
     gap: 14px;

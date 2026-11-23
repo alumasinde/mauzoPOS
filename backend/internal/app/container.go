@@ -22,6 +22,7 @@ import (
 	"mauzo/internal/modules/catalog"
 	"mauzo/internal/modules/inventory"
 	"mauzo/internal/modules/onboarding"
+	"mauzo/internal/modules/pos"
 	"mauzo/internal/modules/pricing"
 	_ "mauzo/internal/modules/registerall" // complete permission registry
 	"mauzo/internal/modules/registry"
@@ -71,6 +72,8 @@ type Container struct {
 	Onboarding    *onboarding.Handler
 	Roles         *roles.Handler
 	Modules       *registry.Handler
+	POS           *pos.Handler
+	POSSvc        *pos.Service
 }
 
 // NewContainer builds the logger, database pool and module services.
@@ -99,17 +102,7 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	accessSvc := roles.NewAccessService(roleRepo, registrySvc, userRepo)
 	roleSvc := roles.NewService(roleRepo, accessSvc)
 
-	authSvc := auth.NewService(cfg, auth.ServiceDeps{
-		Sessions: auth.NewSessionRepo(conn),
-		History:  auth.NewHistoryRepo(conn),
-		Resets:   auth.NewResetRepo(conn),
-		Platform: auth.NewPlatformAccountStore(platformUserRepo),
-		Tenant:   auth.NewTenantAccountStore(userRepo),
-		Tenants:  auth.NewTenantStore(tenantRepo),
-		Mailer:   mailer,
-		Audit:    auditW,
-		Access:   accessSvc,
-	})
+	authSvc := authStack(cfg, conn, tenantRepo, platformUserRepo, userRepo, mailer, auditW, accessSvc)
 
 	tenantSvc, settingsStore, btSvc, branchSvc, terminalSvc := tenantTooling(conn, tenantRepo, authSvc, roleSvc, registrySvc)
 
@@ -119,6 +112,7 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		return nil, err
 	}
 	pricingSvc, promoSvc, invSvc := stockPricingStack(conn, catalogSvc, taxSvc, branchSvc)
+	posSvc := pos.NewService(conn, pos.NewRepo(conn))
 	userSvc := users.NewUserService(userRepo, params, users.Deps{
 		Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc,
 	})
@@ -156,6 +150,8 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		})),
 		Roles:   roles.NewHandler(roleSvc, auditW),
 		Modules: registry.NewHandler(registrySvc, tenantSvc, auditW),
+		POS:     pos.NewHandler(posSvc, registrySvc),
+		POSSvc:  posSvc,
 	}, nil
 }
 
@@ -172,6 +168,26 @@ func tenantTooling(
 	branchSvc := branches.NewService(branches.NewRepo(conn))
 	return tenantSvc, settingsStore, btSvc, branchSvc,
 		terminals.NewService(terminals.NewRepo(conn), branchSvc)
+}
+
+// authStack builds the auth service with its repos and account stores (kept
+// out of NewContainer for readability).
+func authStack(
+	cfg config.Config, conn *sqlx.DB, tenantRepo *tenants.Repo,
+	platformUserRepo *users.PlatformUserRepo, userRepo *users.UserRepo,
+	mailer mail.Mailer, auditW *audit.Writer, accessSvc *roles.AccessService,
+) *auth.Service {
+	return auth.NewService(cfg, auth.ServiceDeps{
+		Sessions: auth.NewSessionRepo(conn),
+		History:  auth.NewHistoryRepo(conn),
+		Resets:   auth.NewResetRepo(conn),
+		Platform: auth.NewPlatformAccountStore(platformUserRepo),
+		Tenant:   auth.NewTenantAccountStore(userRepo),
+		Tenants:  auth.NewTenantStore(tenantRepo),
+		Mailer:   mailer,
+		Audit:    auditW,
+		Access:   accessSvc,
+	})
 }
 
 // catalogStack builds the catalog module's services (kept out of NewContainer

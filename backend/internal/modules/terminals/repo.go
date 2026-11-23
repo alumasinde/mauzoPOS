@@ -16,7 +16,14 @@ type Repo struct {
 // NewRepo builds a Repo.
 func NewRepo(conn *sqlx.DB) *Repo { return &Repo{db: conn} }
 
-const cols = `id, tenant_id, branch_id, public_id, name, status, created_at, updated_at`
+const cols = `id, tenant_id, branch_id, public_id, name, status, device_name, activated_at, last_seen_at, created_at, updated_at`
+
+// SetActivationCode stores the hashed one-time code; NULL clears it.
+func (r *Repo) SetActivationCode(ctx context.Context, terminalID uint64, hash *string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE pos_terminals SET activation_code_hash = ? WHERE id = ?`, hash, terminalID)
+	return err
+}
 
 // List returns a tenant's terminals.
 func (r *Repo) List(ctx context.Context, tenantID uint64) ([]Terminal, error) {
