@@ -22,8 +22,10 @@ type Terminal struct {
 	DeviceName  *string    `db:"device_name"`
 	ActivatedAt *time.Time `db:"activated_at"`
 	LastSeenAt  *time.Time `db:"last_seen_at"`
-	CreatedAt   time.Time  `db:"created_at"`
-	UpdatedAt   time.Time  `db:"updated_at"`
+	// CodeExpiresAt is set while an activation code is waiting to be used.
+	CodeExpiresAt *time.Time `db:"activation_code_expires_at"`
+	CreatedAt     time.Time  `db:"created_at"`
+	UpdatedAt     time.Time  `db:"updated_at"`
 
 	BranchName string `db:"branch_name"` // joined, list only
 }

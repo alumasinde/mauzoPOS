@@ -26,7 +26,7 @@
   }
 
   function pick(c: Customer) {
-    cart.setCustomer(c.id, c.name);
+    cart.setCustomer(c.id, c.name, c.phone);
     open = false;
     q = '';
   }

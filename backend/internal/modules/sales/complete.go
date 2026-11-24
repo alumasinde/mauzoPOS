@@ -29,7 +29,7 @@ type LineInput struct {
 type PaymentInput struct {
 	Method    string  `json:"method"`
 	Amount    string  `json:"amount"`              // applied to the sale
-	Tendered  *string `json:"tendered,omitempty"`  // cash only
+	Tendered  *string `json:"tendered,omitempty"`  // cash given / M-Pesa amount received
 	Reference string  `json:"reference,omitempty"` // card/bank
 }
 
@@ -56,6 +56,10 @@ type CompleteInput struct {
 	ActorType    string
 	SupervisorID *uint64
 	DiscountNote string
+	// Offline marks a sale the till completed without the server. Its M-Pesa
+	// codes are verified on upload; one that cannot be matched is recorded
+	// as unverified instead of rejecting a sale that already happened.
+	Offline bool
 }
 
 // line is a resolved line mid-pipeline.
@@ -93,12 +97,7 @@ func (s *Service) Complete(ctx context.Context, in CompleteInput) (SaleDetail, b
 	if len(in.Payments) == 0 {
 		return SaleDetail{}, false, ErrNoPayments
 	}
-	if in.Source == "" {
-		in.Source = SourcePOS
-	}
-	if in.SoldAt.IsZero() {
-		in.SoldAt = time.Now()
-	}
+	normalizeCompleteInput(&in)
 	// The acting user's permissions and role limits govern overrides and
 	// discounts server-side — the PIN screen is not the security boundary.
 	authz, err := s.cashierAuthz(ctx, in)
@@ -144,6 +143,7 @@ func (s *Service) Complete(ctx context.Context, in CompleteInput) (SaleDetail, b
 	if in.IdempotencyKey != "" {
 		sale.IdemKey = &in.IdempotencyKey
 	}
+	s.stampShift(ctx, in, &sale)
 
 	if err := s.insertSale(ctx, in, &sale, lines, payments); err != nil {
 		if errors.Is(err, ErrDuplicateSale) && in.IdempotencyKey != "" {
@@ -210,16 +210,17 @@ func (s *Service) insertSale(ctx context.Context, in CompleteInput, sale *Sale,
 				stockItems = append(stockItems, req)
 			}
 		}
+		// Claim the M-Pesa transactions cited by payment references — a
+		// mismatched or unconfirmed code rolls the whole sale back (online),
+		// or is recorded as unverified (offline upload).
+		if err := s.consumeMpesa(ctx, tx, sale.TenantID, payments, sale.ID, in.Offline); err != nil {
+			return err
+		}
 		for i := range payments {
 			payments[i].SaleID = sale.ID
 			if err := s.repo.InsertPayment(ctx, tx, &payments[i]); err != nil {
 				return err
 			}
-		}
-		// Claim the M-Pesa transactions cited by payment references — a
-		// mismatched or unconfirmed code rolls the whole sale back.
-		if err := s.consumeMpesa(ctx, tx, sale.TenantID, payments, sale.ID); err != nil {
-			return err
 		}
 		if len(stockItems) > 0 {
 			if err := s.stock.PostStockInTx(ctx, tx, sale.TenantID, in.ActorID, sale.BranchID,

@@ -5,11 +5,14 @@ import { toast } from '@mauzo/ui';
 import { desktop, type PayResult, type POSLayout, type Status, type TerminalInfo } from './desktop';
 import { cart } from './cart.svelte';
 import { mpesafeed } from './mpesafeed.svelte';
+import { paymethods } from './pay/methods.svelte';
 
 const bridge = desktop();
 let info = $state<TerminalInfo | null>(null);
 let status = $state<Status | null>(null);
+let lastSale = $state<PayResult | null>(null);
 let layout = $state<POSLayout | null>(null);
+let syncing = $state(false);
 
 export const pulse = {
   get info() {
@@ -47,18 +50,28 @@ export const pulse = {
     void this.refresh();
   },
 
+  get syncing() {
+    return syncing;
+  },
+
   async sync() {
-    if (!bridge) return;
-    const r = await bridge.Sync();
-    if (!r.ok) {
-      toast.error(r.error ?? 'Sync failed');
-      return;
+    if (!bridge || syncing) return;
+    syncing = true;
+    try {
+      const r = await bridge.Sync();
+      if (!r.ok) {
+        toast.error(r.error ?? 'Sync failed');
+        return;
+      }
+      const sent = await bridge.SyncPending().catch(() => 0);
+      void paymethods.load(); // the shop may have switched methods on/off
+      toast.success(
+        `Synced ${r.products} products, ${r.cashiers} cashiers.${sent ? ` Uploaded ${sent} queued sales.` : ''}`,
+      );
+      await this.refresh();
+    } finally {
+      syncing = false;
     }
-    const sent = await bridge.SyncPending().catch(() => 0);
-    toast.success(
-      `Synced ${r.products} products, ${r.cashiers} cashiers.${sent ? ` Uploaded ${sent} queued sales.` : ''}`,
-    );
-    await this.refresh();
   },
 
   async hold(label: string) {
@@ -72,7 +85,16 @@ export const pulse = {
     }
   },
 
+  /** The sale just completed — shown in the empty cart until the next scan. */
+  get lastSale() {
+    return lastSale;
+  },
+  set lastSale(r: PayResult | null) {
+    lastSale = r;
+  },
+
   async paid(r: PayResult) {
+    lastSale = r;
     await cart.clear();
     toast.success(
       r.offline ? 'Sale queued — will upload on next sync.' : `Sale complete — receipt #${r.receipt_no}.`,

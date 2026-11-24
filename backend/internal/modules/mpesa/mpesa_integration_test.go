@@ -41,7 +41,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	conn := testutil.DB(t)
 	testutil.Truncate(t, conn,
-		"mpesa_reversals", "mpesa_events", "mpesa_transactions", "mpesa_credentials",
+		"mpesa_reversals", "mpesa_events", "mpesa_transactions", "mpesa_credentials", "mpesa_branch_tills",
 		"sale_payments", "sale_items", "sales", "tenant_counters",
 		"user_branches", "users", "role_permissions", "roles",
 		"branches", "tenants")
@@ -57,7 +57,7 @@ func newFixture(t *testing.T) *fixture {
 		`SELECT id FROM tenants WHERE slug='mpesashop'`); err != nil {
 		t.Fatal(err)
 	}
-	branchSvc := branches.NewService(branches.NewRepo(conn))
+	branchSvc := branches.NewService(conn, branches.NewRepo(conn))
 	b, err := branchSvc.Create(ctx, f.tenantID, branches.CreateRequest{Code: "MAIN", Name: "Main"})
 	if err != nil {
 		t.Fatal(err)
@@ -78,10 +78,12 @@ func newFixture(t *testing.T) *fixture {
 		`SELECT id FROM roles WHERE tenant_id=? AND code='cashier'`, f.tenantID); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{
+	perms := []string{
 		"pos.sale.create", "mpesa.transaction.view", "mpesa.transaction.allocate",
 		"mpesa.transaction.reallocate", "mpesa.config.manage",
-	} {
+	}
+	testutil.EnsurePermissions(t, conn, perms...)
+	for _, p := range perms {
 		if _, err := conn.ExecContext(ctx,
 			`INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)`, roleID, p); err != nil {
 			t.Fatal(err)
@@ -462,7 +464,8 @@ func TestConsumeAndReleaseInTx(t *testing.T) {
 
 	// Consume inside a committed tx — row becomes allocated.
 	err := db.WithTx(f.ctx, f.conn, func(tx *sqlx.Tx) error {
-		return f.svc.ConsumeInTx(f.ctx, tx, f.tenantID, "QKR7CS", amt, saleID)
+		_, err := f.svc.ConsumeInTx(f.ctx, tx, f.tenantID, "QKR7CS", amt, saleID, false)
+		return err
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -473,7 +476,7 @@ func TestConsumeAndReleaseInTx(t *testing.T) {
 	}
 	// Rollback frees nothing when the tx fails.
 	err = db.WithTx(f.ctx, f.conn, func(tx *sqlx.Tx) error {
-		if err := f.svc.ConsumeInTx(f.ctx, tx, f.tenantID, "QKR7CS", amt, saleID+1); err == nil {
+		if _, err := f.svc.ConsumeInTx(f.ctx, tx, f.tenantID, "QKR7CS", amt, saleID+1, false); err == nil {
 			return fmt.Errorf("expected already-allocated error")
 		}
 		return fmt.Errorf("forced rollback")
@@ -494,7 +497,8 @@ func TestConsumeAndReleaseInTx(t *testing.T) {
 	}
 	// Wrong amount inside a tx fails cleanly.
 	err = db.WithTx(f.ctx, f.conn, func(tx *sqlx.Tx) error {
-		return f.svc.ConsumeInTx(f.ctx, tx, f.tenantID, "QKR7CS", decimal.NewFromInt(999), saleID)
+		_, err := f.svc.ConsumeInTx(f.ctx, tx, f.tenantID, "QKR7CS", decimal.NewFromInt(999), saleID, false)
+		return err
 	})
 	if err == nil {
 		t.Fatal("amount mismatch consumed")

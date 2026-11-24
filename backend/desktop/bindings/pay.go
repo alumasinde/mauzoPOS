@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"mauzo/desktop/localdb"
 	"mauzo/internal/core/security"
 	"mauzo/pkg/receiptfmt"
 )
@@ -38,6 +39,9 @@ type salePayload struct {
 	Payments        []PayMethod `json:"payments"`
 	SupervisorGrant string      `json:"supervisor_grant,omitempty"`
 	DiscountNote    string      `json:"discount_note,omitempty"`
+	// Offline tells the server this sale already happened at the till: an
+	// M-Pesa code it cannot match is recorded as unverified, not refused.
+	Offline bool `json:"offline,omitempty"`
 }
 
 // PayResult is what the UI shows after tendering.
@@ -51,6 +55,8 @@ type PayResult struct {
 	Printed    bool   `json:"printed"`
 	CanPrint   bool   `json:"can_print"` // PrintLast has a receipt to print
 	PrintError string `json:"print_error,omitempty"`
+	// ReceiptFile is the saved PDF when the till prints to PDF.
+	ReceiptFile string `json:"receipt_file,omitempty"`
 }
 
 // saleResponse is the server reply to POST /pos/sales.
@@ -137,8 +143,13 @@ func (a *App) Pay(paymentsJSON, cartJSON, orderDiscount, customerID, grant, note
 	if !errors.Is(err, ErrOffline) {
 		return PayResult{}, err // validation errors surface to the cashier
 	}
-	// Offline: queue the exact payload; the idempotency key makes replay safe.
-	if err := a.db.RecordPendingSale(a.ctx, key, string(payload), "{}", "", a.cashierID()); err != nil {
+	// Offline: queue the payload, flagged offline; the idempotency key makes
+	// replay safe.
+	queued, err := markOffline(payload)
+	if err != nil {
+		return PayResult{}, err
+	}
+	if err := a.db.RecordPendingSale(a.ctx, key, string(queued), "{}", "", a.cashierID()); err != nil {
 		return PayResult{}, err
 	}
 	res := PayResult{SaleID: key, Offline: true}
@@ -172,6 +183,14 @@ func (a *App) SyncPending() (int, error) {
 			if errors.Is(err, ErrOffline) {
 				break // keep order: retry the rest next sync
 			}
+			var apiErr *apiError
+			if errors.As(err, &apiErr) && apiErr.refused() {
+				// The server refused this sale (it will refuse it every
+				// time): park it for a person instead of retrying forever.
+				if merr := a.db.MarkSaleFailed(a.ctx, row.ID, apiErr.Error()); merr != nil {
+					return uploaded, merr
+				}
+			}
 			lastErr = err
 			continue
 		}
@@ -200,4 +219,58 @@ func (a *App) Customers(search string) (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.Marshal(rows)
+}
+
+// markOffline sets the offline flag on a queued payload.
+func markOffline(payload []byte) ([]byte, error) {
+	var p salePayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return nil, err
+	}
+	p.Offline = true
+	return json.Marshal(p)
+}
+
+// FailedSales lists offline sales the server refused (needs attention).
+func (a *App) FailedSales() ([]localdb.FailedSale, error) {
+	if a.db == nil {
+		return nil, errors.New("local database not ready")
+	}
+	return a.db.FailedSales(a.ctx)
+}
+
+// RetryFailedSale queues a refused sale again and tries to upload it now.
+func (a *App) RetryFailedSale(id string) (int, error) {
+	if a.db == nil {
+		return 0, errors.New("local database not ready")
+	}
+	if err := a.db.RequeueSale(a.ctx, id); err != nil {
+		return 0, err
+	}
+	return a.SyncPending()
+}
+
+// PaymentMethods returns the methods this business accepts, in display order
+// (the payments.methods setting synced from the back office).
+func (a *App) PaymentMethods() []string {
+	order := []string{"cash", "mpesa", "card", "bank", "credit"}
+	allowed := map[string]bool{"cash": true, "mpesa": true, "card": true}
+	if a.db != nil {
+		if raw, _ := a.db.Setting(a.ctx, "payments.methods"); raw != "" {
+			var list []string
+			if json.Unmarshal([]byte(raw), &list) == nil && len(list) > 0 {
+				allowed = map[string]bool{}
+				for _, m := range list {
+					allowed[m] = true
+				}
+			}
+		}
+	}
+	out := []string{}
+	for _, m := range order {
+		if allowed[m] {
+			out = append(out, m)
+		}
+	}
+	return out
 }

@@ -2,6 +2,8 @@
   import { Icon } from '@mauzo/ui';
   import { formatDate, formatTime } from '@mauzo/utils';
   import type { Status, TerminalInfo, Session } from '../desktop';
+  import { mpesafeed } from '../mpesafeed.svelte';
+  import { pulse } from '../pulse.svelte';
 
   let {
     info,
@@ -9,6 +11,7 @@
     status,
     now,
     onsync,
+    onmpesa,
     onsettings,
     onlock,
   }: {
@@ -17,6 +20,7 @@
     status: Status | null;
     now: Date;
     onsync: () => void;
+    onmpesa: () => void;
     onsettings: () => void;
     onlock: () => void;
   } = $props();
@@ -46,6 +50,11 @@
     >
       <i></i>{status?.online ? 'Online' : 'Offline'}
       {#if status && status.pending_sales > 0}<em class="pend">{status.pending_sales}</em>{/if}
+      {#if status && status.failed_sales > 0}
+        <em class="pend bad" title="Offline sales refused by the server — open More → Needs attention">
+          {status.failed_sales} need attention
+        </em>
+      {/if}
     </button>
     <span
       class="printer"
@@ -54,6 +63,23 @@
     >
       <Icon name="printer" size={18} />
     </span>
+    <button
+      class="till-btn feed"
+      onclick={onmpesa}
+      title="M-Pesa payments — collections arriving at this till"
+    >
+      <Icon name="phone" size={17} />
+      {#if mpesafeed.count > 0}<em class="feed-badge">{mpesafeed.count}</em>{/if}
+    </button>
+    <button
+      class="till-btn"
+      class:spin={pulse.syncing}
+      disabled={pulse.syncing}
+      onclick={onsync}
+      title="Sync catalog & upload queued sales"
+    >
+      <Icon name="refresh" size={17} />
+    </button>
   </div>
   <div class="right">
     <span class="clock"><Icon name="clock" size={15} /> {formatDate(now)} {formatTime(now)}</span>
@@ -142,6 +168,53 @@
   }
   .printer.warn {
     opacity: 0.45;
+  }
+  .till-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: rgb(255 255 255 / 0.08);
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.9;
+  }
+  .till-btn:hover {
+    opacity: 1;
+    background: rgb(255 255 255 / 0.16);
+  }
+  .till-btn:disabled {
+    cursor: default;
+  }
+  .till-btn.feed {
+    color: #5ee08a;
+  }
+  .feed-badge {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    min-width: 15px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #00a651;
+    color: #fff;
+    font-size: 0.62rem;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 15px;
+    text-align: center;
+  }
+  .till-btn.spin :global(svg) {
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
   .right {
     display: flex;

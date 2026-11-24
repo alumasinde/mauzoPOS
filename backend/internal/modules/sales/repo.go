@@ -44,11 +44,11 @@ func (r *Repo) NextCounter(ctx context.Context, tx *sqlx.Tx, tenantID uint64, na
 // InsertSale writes the sale row inside tx.
 func (r *Repo) InsertSale(ctx context.Context, tx *sqlx.Tx, s *Sale) error {
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO sales (tenant_id, branch_id, terminal_id, cashier_id, customer_id,
+		`INSERT INTO sales (tenant_id, branch_id, terminal_id, cashier_id, shift_id, customer_id,
 		 public_id, receipt_no, status, source, idempotency_key, currency,
 		 subtotal, discount, tax, total, paid, change_due, discount_note, sold_at)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		s.TenantID, s.BranchID, s.TerminalID, s.CashierID, s.CustomerID,
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		s.TenantID, s.BranchID, s.TerminalID, s.CashierID, s.ShiftID, s.CustomerID,
 		s.PublicID, s.ReceiptNo, s.Status, s.Source, s.IdemKey, s.Currency,
 		s.Subtotal, s.Discount, s.Tax, s.Total, s.Paid, s.ChangeDue, s.DiscountNote, s.SoldAt)
 	if err != nil {
@@ -401,6 +401,7 @@ type CashierAuthz struct {
 	Perms       map[string]bool
 	MaxDiscount *string
 	MaxRefund   *string
+	MaxCashOut  *string
 	RoleName    string
 }
 
@@ -412,9 +413,11 @@ func (r *Repo) CashierAuthz(ctx context.Context, tenantID, userID uint64) (*Cash
 		Locked      bool    `db:"is_locked"`
 		MaxDiscount *string `db:"max_discount_percent"`
 		MaxRefund   *string `db:"max_refund_amount"`
+		MaxCashOut  *string `db:"max_cash_out_amount"`
 	}
 	err := r.conn.GetContext(ctx, &row,
-		`SELECT u.id, ro.name AS role_name, ro.is_locked, ro.max_discount_percent, ro.max_refund_amount
+		`SELECT u.id, ro.name AS role_name, ro.is_locked, ro.max_discount_percent, ro.max_refund_amount,
+		 ro.max_cash_out_amount
 		 FROM users u JOIN roles ro ON ro.id = u.role_id
 		 WHERE u.id = ? AND u.tenant_id = ? AND u.status = 'active'`, userID, tenantID)
 	if err != nil {
@@ -429,7 +432,8 @@ func (r *Repo) CashierAuthz(ctx context.Context, tenantID, userID uint64) (*Cash
 	if err != nil {
 		return nil, err
 	}
-	out := &CashierAuthz{UserID: row.ID, RoleName: row.RoleName, MaxDiscount: row.MaxDiscount, MaxRefund: row.MaxRefund, Perms: map[string]bool{}}
+	out := &CashierAuthz{UserID: row.ID, RoleName: row.RoleName, MaxDiscount: row.MaxDiscount,
+		MaxRefund: row.MaxRefund, MaxCashOut: row.MaxCashOut, Perms: map[string]bool{}}
 	for _, p := range perms {
 		out.Perms[p.Permission] = true
 	}
@@ -494,8 +498,9 @@ func (r *Repo) MpesaCandidates(ctx context.Context, tenantID uint64, since time.
 	err := r.conn.SelectContext(ctx, &rows,
 		`SELECT s.id AS sale_id, s.public_id, s.receipt_no, s.branch_id,
 		   b.name AS branch_name, COALESCE(u.name,'') AS cashier_name,
-		   s.total, SUM(sp.amount) AS mpesa_amount,
-		   COALESCE(MAX(NULLIF(sp.reference,'')),'') AS reference, s.sold_at
+		   s.total, SUM(COALESCE(sp.tendered, sp.amount)) AS mpesa_amount,
+		   COALESCE(MAX(NULLIF(sp.reference,'')),'') AS reference, s.sold_at,
+		   MAX(sp.status = 'unverified') AS unverified
 		 FROM sales s
 		 JOIN sale_payments sp ON sp.sale_id = s.id AND sp.method = 'mpesa' AND sp.amount > 0
 		 JOIN branches b ON b.id = s.branch_id

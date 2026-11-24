@@ -54,6 +54,7 @@ type Service struct {
 	stock     Stock
 	customers CustomerLookup
 	mpesa     MpesaConsumer
+	shifts    Shifts
 }
 
 // NewService builds a Service.

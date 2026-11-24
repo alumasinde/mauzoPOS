@@ -30,6 +30,10 @@ export const ROUTES = [
   '/sales/returns',
   '/sales/held',
   '/customers',
+  '/branches',
+  '/shifts',
+  '/mpesa',
+  '/account',
 ] as const;
 
 export type AppRoute = (typeof ROUTES)[number];
@@ -67,5 +71,6 @@ export function activeKey(
 export function hrefFor(path: string): string {
   const { base, query } = splitPath(path);
   const q = query.toString();
-  return resolve(base as AppRoute) + (q ? `?${q}` : '');
+  // resolve() is overloaded per-route; a union nav path needs a plain call.
+  return (resolve as (r: AppRoute) => string)(base as AppRoute) + (q ? `?${q}` : '');
 }

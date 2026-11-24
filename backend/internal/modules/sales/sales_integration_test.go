@@ -55,7 +55,7 @@ func setup(t *testing.T) fixture {
 	if err := conn.GetContext(ctx, &tenantID, `SELECT id FROM tenants WHERE slug='saleshop'`); err != nil {
 		t.Fatal(err)
 	}
-	branchSvc := branches.NewService(branches.NewRepo(conn))
+	branchSvc := branches.NewService(conn, branches.NewRepo(conn))
 	b, err := branchSvc.Create(ctx, tenantID, branches.CreateRequest{Code: "MAIN", Name: "Main"})
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +76,7 @@ func setup(t *testing.T) fixture {
 		`SELECT id FROM roles WHERE tenant_id = ? AND code='cashier'`, tenantID); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsurePermissions(t, conn, "pos.sale.create", "pos.discount.apply")
 	if _, err := conn.ExecContext(ctx,
 		`INSERT INTO role_permissions (role_id, permission) VALUES
 		 (?, 'pos.sale.create'), (?, 'pos.discount.apply')`, roleID, roleID); err != nil {
@@ -494,5 +495,26 @@ func TestLockedOwnerHoldsEveryPermission(t *testing.T) {
 		if !a.Perms[p] {
 			t.Errorf("owner lacks %s", p)
 		}
+	}
+}
+
+// A method the business switched off is refused by the server, not just
+// hidden on the till.
+func TestDisabledMethodRefused(t *testing.T) {
+	f := setup(t)
+	if _, err := f.conn.ExecContext(f.ctx,
+		"INSERT INTO tenant_settings (tenant_id, `key`, value) VALUES (?, 'payments.methods', '[\"cash\",\"mpesa\"]')",
+		f.tenantID); err != nil {
+		t.Fatal(err)
+	}
+	in := baseInput(f)
+	in.Payments = []sales.PaymentInput{{Method: "card", Amount: "200.00", Reference: "AUTH01"}}
+	if _, _, err := f.svc.Complete(f.ctx, in); !errors.Is(err, sales.ErrMethodDisabled) {
+		t.Fatalf("card with card switched off: %v", err)
+	}
+	in.IdempotencyKey = security.NewPublicID()
+	in.Payments = []sales.PaymentInput{{Method: "cash", Amount: "200.00"}}
+	if _, _, err := f.svc.Complete(f.ctx, in); err != nil {
+		t.Fatalf("cash: %v", err)
 	}
 }

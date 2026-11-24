@@ -25,6 +25,8 @@ export interface Status {
   last_sync: string;
   printer: string; // ready | offline | not_configured
   pending_sales: number;
+  /** Offline sales the server refused — need a supervisor. */
+  failed_sales: number;
 }
 
 export interface Cashier {
@@ -136,12 +138,15 @@ export interface PayResult {
   /** PrintLast() has an unprinted receipt for this sale. */
   can_print: boolean;
   print_error?: string;
+  /** Saved PDF when the till prints to PDF. */
+  receipt_file?: string;
 }
 
 export interface ReprintResult {
   copy_no: number;
   printed: boolean;
   error?: string;
+  file?: string;
 }
 
 /** One M-Pesa feed transaction (server wire shape). */
@@ -162,11 +167,11 @@ export interface MpesaTxn {
 
 /** One SSE feed event from the Go pump. */
 export interface MpesaFeedEvent {
-  kind: string; // collection | reversal
+  kind: string; // collection | reversal | stk (a prompt's result)
   txn: MpesaTxn;
 }
 
-export type PrinterKind = 'none' | 'windows' | 'network' | 'file';
+export type PrinterKind = 'none' | 'windows' | 'network' | 'pdf' | 'file';
 export type AutoPrint = 'default' | 'always' | 'never';
 
 export interface AuthorizeResult {
@@ -261,7 +266,9 @@ interface DesktopApp {
   SaveSettings(s: TerminalSettings): Promise<void>;
   ListPrinters(): Promise<string[]>;
   TestPrint(): Promise<void>;
-  PrintLast(): Promise<void>;
+  /** Resolves to the saved PDF path when printing to PDF, else ''. */
+  PrintLast(): Promise<string>;
+  OpenReceiptFile(path: string): Promise<void>;
   Reprint(ref: string, grant: string): Promise<ReprintResult>;
   OpenDrawer(): Promise<void>;
   MpesaPush(phone: string, amount: string, accountRef: string): Promise<MpesaTxn>;
@@ -270,7 +277,26 @@ interface DesktopApp {
   MpesaAllocate(id: string, saleRef: string): Promise<void>;
   MpesaFeedStart(): Promise<void>;
   MpesaFeedStop(): Promise<void>;
+  PaymentMethods(): Promise<string[]>;
+  FailedSales(): Promise<FailedSale[]>;
+  RetryFailedSale(id: string): Promise<number>;
+  /** Exits the app — the frameless kiosk build has no window chrome. */
+  Quit(): Promise<void>;
+  ShiftStatus(): Promise<{ shift: Shift | null }>;
+  ShiftOpen(floatAmount: string): Promise<Shift>;
+  ShiftCash(direction: string, amount: string, reason: string): Promise<unknown>;
+  /** Audits a no-sale drawer open, then kicks the drawer. */
+  ShiftDrawer(): Promise<void>;
+  /** Running totals for the open shift. */
+  ShiftXReport(): Promise<ShiftReport>;
+  ShiftReport(shiftID: string): Promise<ShiftReport>;
+  /** Blind-count close; resolves to the Z-report. */
+  ShiftClose(declared: string, note: string): Promise<ShiftReport>;
+  PrintShiftReport(report: ShiftReport): Promise<string>;
 }
+
+export type { FailedSale, Shift, ShiftReport } from './types';
+import type { FailedSale, Shift, ShiftReport } from './types';
 
 declare global {
   interface Window {

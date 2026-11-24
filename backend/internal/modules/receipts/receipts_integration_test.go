@@ -60,7 +60,7 @@ func setup(t *testing.T) fixture {
 	}
 	var tenantID uint64
 	must(t, conn.GetContext(ctx, &tenantID, `SELECT id FROM tenants WHERE slug='rcptshop'`))
-	branchSvc := branches.NewService(branches.NewRepo(conn))
+	branchSvc := branches.NewService(conn, branches.NewRepo(conn))
 	b, err := branchSvc.Create(ctx, tenantID, branches.CreateRequest{Code: "MAIN", Name: "Main Store"})
 	must(t, err)
 	branchID, err := branchSvc.BranchByPublicID(ctx, tenantID, b.PublicID)

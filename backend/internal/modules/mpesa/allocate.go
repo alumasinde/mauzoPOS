@@ -20,6 +20,7 @@ type SalesDep interface {
 	LookupBrief(ctx context.Context, tenantID, saleID uint64) (sales.SaleBrief, bool)
 	MpesaPayments(ctx context.Context, tenantID uint64, since time.Time) ([]sales.MpesaCandidate, error)
 	Authz(ctx context.Context, tenantID, userID uint64) (*sales.CashierAuthz, error)
+	MarkMpesaVerified(ctx context.Context, tenantID, saleID uint64, transID string) error
 }
 
 // BindSales wires the sales dependency after construction (container order).
@@ -30,8 +31,9 @@ func (s *Service) BindSales(dep SalesDep) { s.sales = dep }
 //   - txn is a confirmed success, not already allocated
 //   - sale exists, completed (or partially returned), same tenant
 //   - branch matches when the txn carries one
-//   - the sale has an mpesa payment line for exactly this amount whose
-//     reference is empty or already cites this transaction
+//   - the sale has an mpesa payment line whose received amount (tendered,
+//     else applied) equals this transaction, and whose reference is empty,
+//     already cites this transaction, or is an unverified offline entry
 func (s *Service) verifyAllocation(ctx context.Context, tenantID uint64,
 	t *Transaction, salePublicID string) (*sales.SaleDetail, error) {
 	if t.Status != StSuccess || t.TransID == nil {
@@ -50,19 +52,7 @@ func (s *Service) verifyAllocation(ctx context.Context, tenantID uint64,
 	if t.BranchID != nil && *t.BranchID != detail.Sale.BranchID {
 		return nil, ErrBranchMismatch
 	}
-	matched := false
-	for _, p := range detail.Payments {
-		if p.Method != "mpesa" || !p.Amount.IsPositive() {
-			continue
-		}
-		if p.Reference != "" && p.Reference != *t.TransID {
-			continue // line cites a different transaction
-		}
-		if p.Amount.Equal(t.Amount) {
-			matched = true
-		}
-	}
-	if !matched {
+	if !anyLineMatches(detail.Payments, t) {
 		return nil, ErrAmountMismatch
 	}
 	return &detail, nil
@@ -80,6 +70,9 @@ func (s *Service) Allocate(ctx context.Context, tenantID, actorID uint64,
 		return err
 	}
 	if err := s.repo.Allocate(ctx, t.ID, detail.Sale.ID, actorID); err != nil {
+		return err
+	}
+	if err := s.sales.MarkMpesaVerified(ctx, tenantID, detail.Sale.ID, deref(t.TransID)); err != nil {
 		return err
 	}
 	LogEvent(ctx, s.conn, tenantID, &t.ID, EvAllocation, deref(t.TransID),
@@ -151,7 +144,7 @@ func (s *Service) Suggestions(ctx context.Context, tenantID uint64) ([]Suggestio
 	for i := range candidates {
 		candidates[i].Allocated = claimed[candidates[i].SaleID]
 	}
-	var out []Suggestion
+	out := []Suggestion{}
 	for i := range txns {
 		t := &txns[i]
 		for j := range candidates {
@@ -163,6 +156,9 @@ func (s *Service) Suggestions(ctx context.Context, tenantID uint64) ([]Suggestio
 			if t.TransID != nil && c.Reference == *t.TransID {
 				strength = "strong"
 			}
+			if c.Unverified && strength == "weak" {
+				strength = "unverified" // offline entry awaiting its transaction
+			}
 			if t.BranchID != nil && *t.BranchID != c.BranchID {
 				continue
 			}
@@ -172,12 +168,21 @@ func (s *Service) Suggestions(ctx context.Context, tenantID uint64) ([]Suggestio
 	return out, nil
 }
 
-// mpesaLineTotal sums confirmed positive mpesa tender on a sale.
+// received is what the customer sent on a line: tendered when recorded
+// (overpayments handed back as change), else the applied amount.
+func received(p sales.SalePayment) decimal.Decimal {
+	if p.Tendered != nil && p.Tendered.IsPositive() {
+		return *p.Tendered
+	}
+	return p.Amount
+}
+
+// mpesaLineTotal sums positive mpesa tender received on a sale.
 func mpesaLineTotal(payments []sales.SalePayment) decimal.Decimal {
 	sum := decimal.Zero
 	for _, p := range payments {
 		if p.Method == "mpesa" && p.Amount.IsPositive() {
-			sum = sum.Add(p.Amount)
+			sum = sum.Add(received(p))
 		}
 	}
 	return sum
@@ -185,8 +190,11 @@ func mpesaLineTotal(payments []sales.SalePayment) decimal.Decimal {
 
 func anyLineMatches(payments []sales.SalePayment, t *Transaction) bool {
 	for _, p := range payments {
-		if p.Method == "mpesa" && p.Amount.IsPositive() && p.Amount.Equal(t.Amount) &&
-			(p.Reference == "" || (t.TransID != nil && p.Reference == *t.TransID)) {
+		if p.Method != "mpesa" || !p.Amount.IsPositive() || !received(p).Equal(t.Amount) {
+			continue
+		}
+		if p.Reference == "" || p.Status == sales.PayUnverified ||
+			(t.TransID != nil && p.Reference == *t.TransID) {
 			return true
 		}
 	}

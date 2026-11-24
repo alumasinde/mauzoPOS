@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,7 +49,7 @@ func setup(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 
-	branchSvc := branches.NewService(branches.NewRepo(conn))
+	branchSvc := branches.NewService(conn, branches.NewRepo(conn))
 	b, err := branchSvc.Create(ctx, tenantID, branches.CreateRequest{Code: "MAIN", Name: "Main"})
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +77,7 @@ func setup(t *testing.T) fixture {
 		`SELECT id FROM roles WHERE tenant_id = ? AND code='cashier'`, tenantID); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsurePermissions(t, conn, "pos.access", "pos.supervisor.authorize")
 	if _, err := conn.ExecContext(ctx,
 		`INSERT INTO role_permissions (role_id, permission) VALUES (?, 'pos.access'), (?, 'pos.supervisor.authorize')`,
 		roleID, roleID); err != nil {
@@ -114,9 +116,13 @@ func TestActivationAndAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := f.termSvc.IssueCode(f.ctx, f.tenantID, term.PublicID)
+	issued, err := f.termSvc.IssueCode(f.ctx, f.tenantID, term.PublicID, nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	code := issued.Code
+	if issued.Repair || len(code) != 11 || code[5] != '-' || strings.ContainsAny(code, "01OIL") {
+		t.Fatalf("issued %+v", issued)
 	}
 
 	// Bad code rejected.
@@ -126,8 +132,9 @@ func TestActivationAndAuth(t *testing.T) {
 		t.Fatalf("want ErrBadActivationCode, got %v", err)
 	}
 
+	// Typed in lower case without the dash still works.
 	act, err := f.svc.Activate(f.ctx, pos.ActivateRequest{
-		Code: code, DeviceName: "Till T1", DeviceID: "dev-1",
+		Code: strings.ToLower(strings.ReplaceAll(code, "-", "")), DeviceName: "Till T1", DeviceID: "dev-1",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -154,6 +161,45 @@ func TestActivationAndAuth(t *testing.T) {
 	}); !errors.Is(err, pos.ErrBadActivationCode) {
 		t.Fatalf("replayed code: %v", err)
 	}
+
+	// Re-pair: a new code moves the terminal to a new PC; the old token dies.
+	again, err := f.termSvc.IssueCode(f.ctx, f.tenantID, term.PublicID, nil)
+	if err != nil || !again.Repair {
+		t.Fatalf("re-pair code %+v %v", again, err)
+	}
+	act2, err := f.svc.Activate(f.ctx, pos.ActivateRequest{Code: again.Code, DeviceName: "New PC", DeviceID: "dev-2"})
+	if err != nil {
+		t.Fatalf("re-pair: %v", err)
+	}
+	if _, err := f.svc.AuthenticateDevice(f.ctx, act.Token); err == nil {
+		t.Fatal("old device still authenticated after re-pair")
+	}
+	if _, err := f.svc.AuthenticateDevice(f.ctx, act2.Token); err != nil {
+		t.Fatalf("new device: %v", err)
+	}
+
+	// Expired codes are reported as expired.
+	exp, _ := f.termSvc.IssueCode(f.ctx, f.tenantID, term.PublicID, nil)
+	if _, err := f.conn.ExecContext(f.ctx,
+		`UPDATE pos_terminals SET activation_code_expires_at = UTC_TIMESTAMP(3) - INTERVAL 1 MINUTE WHERE public_id = ?`,
+		term.PublicID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Activate(f.ctx, pos.ActivateRequest{Code: exp.Code, DeviceID: "dev-3"}); !errors.Is(err, pos.ErrActivationExpired) {
+		t.Fatalf("expired: %v", err)
+	}
+
+	// Disabling signs the device out and blocks new codes.
+	disabled := "disabled"
+	if _, err := f.termSvc.Update(f.ctx, f.tenantID, term.PublicID, terminals.UpdateRequest{Status: &disabled}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.AuthenticateDevice(f.ctx, act2.Token); err == nil {
+		t.Fatal("disabled terminal still authenticated")
+	}
+	if _, err := f.termSvc.IssueCode(f.ctx, f.tenantID, term.PublicID, nil); !errors.Is(err, terminals.ErrIsDisabled) {
+		t.Fatalf("code for disabled terminal: %v", err)
+	}
 }
 
 func TestSyncSignInAndHeld(t *testing.T) {
@@ -168,8 +214,8 @@ func TestSyncSignInAndHeld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, _ := f.termSvc.IssueCode(f.ctx, f.tenantID, term.PublicID)
-	act, err := f.svc.Activate(f.ctx, pos.ActivateRequest{Code: code, DeviceID: "dev-1"})
+	issued, _ := f.termSvc.IssueCode(f.ctx, f.tenantID, term.PublicID, nil)
+	act, err := f.svc.Activate(f.ctx, pos.ActivateRequest{Code: issued.Code, DeviceID: "dev-1"})
 	if err != nil {
 		t.Fatal(err)
 	}

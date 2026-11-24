@@ -10,11 +10,22 @@
   let error = $state('');
   let busy = $state(false);
 
+  // Codes are 10 characters shown as ABCDE-FGH23; format while typing so the
+  // cashier can compare with the back-office screen at a glance.
+  function formatCode(raw: string): string {
+    const c = raw
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 10);
+    return c.length > 5 ? `${c.slice(0, 5)}-${c.slice(5)}` : c;
+  }
+  const ready = $derived(code.replace('-', '').length === 10);
+
   async function activate() {
     if (!bridge) return;
     error = '';
-    if (!apiUrl || code.length < 6 || !deviceName) {
-      error = 'Fill in the server address, device name and activation code.';
+    if (!apiUrl || !ready || !deviceName.trim()) {
+      error = 'Fill in the server address, device name and the 10-character activation code.';
       return;
     }
     busy = true;
@@ -33,7 +44,8 @@
   <div class="card">
     <h1>Activate this terminal</h1>
     <p class="muted">
-      One-time setup. Get the activation code from the back office: Settings → POS terminals → Issue code.
+      One-time setup. In the back office open <b>Team &amp; access → POS terminals</b>, choose this till and
+      press <b>Get activation code</b>. Codes are valid for 24 hours.
     </p>
     <label>
       Server address
@@ -45,16 +57,31 @@
     </label>
     <label>
       Activation code
-      <input bind:value={code} placeholder="e.g. ab12cd34ef56" autocomplete="off" />
+      <input
+        class="code"
+        value={code}
+        oninput={(e) => (code = e.currentTarget.value = formatCode(e.currentTarget.value))}
+        onkeydown={(e) => e.key === 'Enter' && activate()}
+        placeholder="ABCDE-FGH23"
+        autocomplete="off"
+        spellcheck="false"
+      />
     </label>
     {#if error}<p class="err">{error}</p>{/if}
-    <button class="go" onclick={activate} disabled={busy}>
+    <button class="go" onclick={activate} disabled={busy || !ready}>
       {busy ? 'Activating…' : 'Activate terminal'}
     </button>
   </div>
 </div>
 
 <style>
+  .code {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-align: center;
+    font-family: var(--font-mono, monospace);
+  }
   .screen {
     display: grid;
     place-items: center;

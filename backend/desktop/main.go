@@ -5,6 +5,7 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -26,13 +27,21 @@ func main() {
 	cfg := settings.Load()
 	app := bindings.NewApp(Version, cfg)
 
+	// Kiosk by default: fullscreen, no taskbar, no window chrome. Development
+	// can opt back into a normal window with MAUZO_WINDOWED=1.
+	windowed := os.Getenv("MAUZO_WINDOWED") == "1"
+	start := options.Fullscreen
+	if windowed {
+		start = options.Maximised
+	}
 	err := wails.Run(&options.App{
 		Title:            "Mauzo POS",
 		Width:            1366,
 		Height:           768,
 		MinWidth:         1024,
 		MinHeight:        700,
-		WindowStartState: options.Maximised,
+		WindowStartState: start,
+		Frameless:        !windowed,
 		AssetServer:      &assetserver.Options{Assets: assets},
 		OnStartup:        app.Startup,
 		Bind:             []any{app},

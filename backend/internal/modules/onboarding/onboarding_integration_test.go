@@ -73,7 +73,7 @@ func setup(t *testing.T) (*onboarding.Service, *sqlx.DB, uint64) {
 	planSvc.OnPlanChange(rbac.Registry.Invalidate)
 	tenantSvc.AddProvisioner(rbac.Roles)
 	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc, rbac.Registry)
-	branchSvc := branches.NewService(branches.NewRepo(conn))
+	branchSvc := branches.NewService(conn, branches.NewRepo(conn))
 	termSvc := terminals.NewService(terminals.NewRepo(conn), branchSvc)
 	userSvc := users.NewUserService(userRepo, security.DefaultArgon2Params, users.Deps{
 		Roles: rbac.Roles, Branches: branchSvc, Seats: planSvc,

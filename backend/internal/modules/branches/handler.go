@@ -3,6 +3,8 @@ package branches
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/identity"
 )
@@ -76,4 +78,24 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Created(w, ToResponse(b))
+}
+
+// Update handles PATCH /t/branches/{id}.
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	actor, ok := identity.ActorFrom(r.Context())
+	if !ok || actor.TenantID == 0 {
+		httpx.WriteError(w, r, httpx.ErrForbidden)
+		return
+	}
+	var req UpdateRequest
+	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	b, err := h.svc.Update(r.Context(), actor.TenantID, chi.URLParam(r, "id"), req)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.OK(w, ToResponse(b))
 }

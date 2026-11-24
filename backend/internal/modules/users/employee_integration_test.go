@@ -64,7 +64,7 @@ func setup(t *testing.T) *env {
 	e.b1ID, e.b1 = rbactest.Branch(t, conn, e.tid, "B1")
 	_, e.b2 = rbactest.Branch(t, conn, e.tid, "B2")
 	e.svc = users.NewUserService(repo, fastParams, users.Deps{
-		Roles: rbac.Roles, Branches: branches.NewService(branches.NewRepo(conn)),
+		Roles: rbac.Roles, Branches: branches.NewService(conn, branches.NewRepo(conn)),
 		Sessions: e.revoked, Seats: e.seats, Access: rbac.Access,
 	})
 	ownerUser, err := e.svc.CreateTenantUser(context.Background(), e.tid, "Owner", "owner@emp.test", "", "password123", authz.RoleOwner)

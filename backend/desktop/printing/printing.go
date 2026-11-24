@@ -6,6 +6,11 @@
 //     written RAW through the print spooler, so the driver never re-renders it.
 //   - network: an Ethernet/Wi-Fi printer listening on TCP 9100 (raw port).
 //
+// A "pdf" transport saves each receipt as a PDF file and opens it — for tills
+// with no thermal printer. Windows' own document printers (Microsoft Print to
+// PDF, XPS Document Writer, OneNote, Fax) cannot take raw ESC/POS: sent RAW
+// they produce an empty file, so receipts for them are saved as PDF too.
+//
 // A "file" transport appends jobs to a file for development and support.
 package printing
 
@@ -26,7 +31,25 @@ const (
 	KindWindows = "windows"
 	KindNetwork = "network"
 	KindFile    = "file"
+	KindPDF     = "pdf"
 )
+
+// IsDocumentPrinter reports whether an installed Windows printer is a virtual
+// document printer that writes files rather than paper.
+func IsDocumentPrinter(name string) bool {
+	n := strings.ToLower(name)
+	for _, s := range []string{"pdf", "xps", "onenote", "fax", "document writer"} {
+		if strings.Contains(n, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// SavesPDF reports whether receipts for c are saved as PDF files.
+func (c Config) SavesPDF() bool {
+	return c.Kind == KindPDF || (c.Kind == KindWindows && IsDocumentPrinter(c.Name))
+}
 
 // Config is the terminal's printer connection.
 type Config struct {
@@ -42,6 +65,8 @@ var ErrNotConfigured = errors.New("no receipt printer is configured")
 // Configured reports whether c points at a printer.
 func (c Config) Configured() bool {
 	switch c.Kind {
+	case KindPDF:
+		return true
 	case KindWindows, KindFile:
 		return strings.TrimSpace(c.Name) != ""
 	case KindNetwork:

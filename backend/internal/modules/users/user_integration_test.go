@@ -137,7 +137,7 @@ func TestTenantUserCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := NewUserService(NewUserRepo(conn), testParams, Deps{
-		Roles: rbac.Roles, Branches: branches.NewService(branches.NewRepo(conn)),
+		Roles: rbac.Roles, Branches: branches.NewService(conn, branches.NewRepo(conn)),
 	})
 	u, err := svc.CreateTenantUser(ctx, tn.ID, "Cashier", "C@T.Local", "c1", "password123", authz.RoleCashier)
 	if err != nil {

@@ -26,8 +26,12 @@ const (
 // Payment statuses.
 const (
 	PayConfirmed = "confirmed"
-	PayVoided    = "voided"
-	PayRefunded  = "refunded"
+	// PayUnverified: an M-Pesa code recorded by a till while offline that the
+	// server could not match on upload. The sale stands (the goods left);
+	// the payment waits in M-Pesa reconciliation.
+	PayUnverified = "unverified"
+	PayVoided     = "voided"
+	PayRefunded   = "refunded"
 )
 
 // Counter names in tenant_counters.
@@ -43,6 +47,7 @@ type Sale struct {
 	BranchID     uint64          `db:"branch_id"`
 	TerminalID   *uint64         `db:"terminal_id"`
 	CashierID    *uint64         `db:"cashier_id"`
+	ShiftID      *uint64         `db:"shift_id"`
 	CustomerID   *uint64         `db:"customer_id"`
 	PublicID     string          `db:"public_id"`
 	ReceiptNo    uint64          `db:"receipt_no"`

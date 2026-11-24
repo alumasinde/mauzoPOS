@@ -22,10 +22,9 @@ const maxSTKPushesPerDay = 400
 // stkQueryAfter / stkGiveUpAfter pace the status-query fallback: Daraja's
 // callback is the primary path; we only ask when the customer has had time.
 const (
-	stkQueryAfter   = 20 * time.Second
-	stkQueryEvery   = 15 * time.Second
-	stkGiveUpAfter  = 130 * time.Second
-	pendingFeedDays = 30 * 24 * time.Hour
+	stkQueryAfter  = 20 * time.Second
+	stkQueryEvery  = 15 * time.Second
+	stkGiveUpAfter = 130 * time.Second
 )
 
 // Auditor writes audit-log rows for sensitive actions.
@@ -96,6 +95,9 @@ type ConfigView struct {
 	HasConsumerSecret     bool   `json:"has_consumer_secret"`
 	HasPasskey            bool   `json:"has_passkey"`
 	HasSecurityCredential bool   `json:"has_security_credential"`
+	// SecretsUnreadable is true when stored secrets cannot be decrypted under
+	// the current key — the view still renders so credentials can be re-entered.
+	SecretsUnreadable bool `json:"secrets_unreadable"`
 }
 
 // Config returns the masked config view (secrets never leave the server).
@@ -105,16 +107,19 @@ func (s *Service) Config(ctx context.Context, tenantID uint64) (*ConfigView, err
 		return &ConfigView{}, err
 	}
 	secs, err := s.secrets(c)
-	if err != nil {
-		return nil, err
+	unreadable := err != nil
+	if unreadable {
+		secs = &Secrets{}
 	}
 	v := &ConfigView{
 		Env: c.Env, ShortCode: c.ShortCode, ShortCodeKind: c.ShortCodeKind,
 		ConsumerKey: mask(secs.ConsumerKey), ConsumerSecret: mask(secs.ConsumerSecret),
 		Passkey: mask(secs.Passkey), InitiatorName: c.InitiatorName,
-		SecurityCredential: mask(secs.SecurityCredential),
-		HasConsumerSecret:  secs.ConsumerSecret != "", HasPasskey: secs.Passkey != "",
-		HasSecurityCredential: secs.SecurityCredential != "",
+		SecurityCredential:    mask(secs.SecurityCredential),
+		HasConsumerSecret:     unreadable && c.ConsumerSecretEnc != nil || secs.ConsumerSecret != "",
+		HasPasskey:            unreadable && c.PasskeyEnc != nil || secs.Passkey != "",
+		HasSecurityCredential: unreadable && c.SecurityCredentialEnc != nil || secs.SecurityCredential != "",
+		SecretsUnreadable:     unreadable,
 		STKCallbackURL:        s.base + "/api/v1/hooks/mpesa/" + c.CallbackToken + "/stk",
 		C2BConfirmationURL:    s.base + "/api/v1/hooks/mpesa/" + c.CallbackToken + "/c2b/confirmation",
 		C2BValidationURL:      s.base + "/api/v1/hooks/mpesa/" + c.CallbackToken + "/c2b/validation",
@@ -419,6 +424,7 @@ func (s *Service) applyOutcome(ctx context.Context, t *Transaction, code int, de
 	if transID != "" {
 		t.TransID = &transID
 	}
+	s.publishSTK(t.TenantID, t)
 	return nil
 }
 

@@ -196,6 +196,16 @@ export interface PosTerminal {
   activated_at?: string | null;
   last_seen_at?: string | null;
   online?: boolean;
+  /** Set while an activation code is waiting to be used. */
+  code_expires_at?: string | null;
+}
+
+/** A freshly issued activation code — shown once. */
+export interface IssuedTerminalCode {
+  code: string;
+  expires_at: string;
+  /** The terminal already has a device: using the code moves it to a new PC. */
+  repair: boolean;
 }
 
 export interface SettingEntry {

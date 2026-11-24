@@ -158,7 +158,8 @@ CREATE TABLE IF NOT EXISTS pending_sales (
     payment    TEXT NOT NULL DEFAULT 'cash',
     cashier_id TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    uploaded   INTEGER NOT NULL DEFAULT 0 -- Phase 7 uploads these
+    uploaded   INTEGER NOT NULL DEFAULT 0, -- 0 queued, 1 uploaded, 2 refused (see pending.go)
+    last_error TEXT NOT NULL DEFAULT ''
 );
 `
 
@@ -170,11 +171,24 @@ func Open(ctx context.Context, path string) (*DB, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // SQLite serialises writers anyway
+	d := &DB{db}
+	// An index on a column an older database lacks makes the schema fail
+	// first time round: add the missing columns, then apply it again.
 	if _, err := db.ExecContext(ctx, schema); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("localdb schema: %w", err)
+		if uerr := upgrade(ctx, d); uerr != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("localdb schema: %w (upgrade: %w)", err, uerr)
+		}
+		if _, err := db.ExecContext(ctx, schema); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("localdb schema: %w", err)
+		}
 	}
-	return &DB{db}, nil
+	if err := upgrade(ctx, d); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("localdb upgrade: %w", err)
+	}
+	return d, nil
 }
 
 // Meta reads a meta key; missing keys return ("", nil).

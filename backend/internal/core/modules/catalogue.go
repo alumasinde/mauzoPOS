@@ -103,7 +103,9 @@ var operationsModules = []Module{
 		Nav:         []NavItem{{Key: "receipt-designer", Label: "Receipt designer", Path: "/receipts/designer", Icon: "printer", Section: SectionConfig, Permission: "receipts.template.manage", Order: 4}},
 	},
 	{Code: "shifts", Name: "Cashier shifts", Group: GroupOperations, Depends: []string{"sales", "terminals"},
-		Description: "Shift open/close, cash counts, X/Z reports."},
+		Description: "Shift open/close, cash counts, X/Z reports.",
+		Nav:         []NavItem{{Key: "shifts", Label: "Cashier shifts", Path: "/shifts", Icon: "clock", Section: SectionSales, Permission: "shifts.shift.view", Order: 5}},
+	},
 	{Code: "reports", Name: "Reports", Group: GroupOperations,
 		Description: "Sales, stock, tax and financial reports.",
 		Nav: []NavItem{

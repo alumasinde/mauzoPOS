@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"mauzo/desktop/localdb"
 	"mauzo/desktop/settings"
 	"mauzo/pkg/barcode"
@@ -81,6 +83,10 @@ func (a *App) Startup(ctx context.Context) {
 		}
 	}
 }
+
+// Quit exits the app — the frameless kiosk build has no close button, so the
+// More sheet calls this (Alt+F4 also still works).
+func (a *App) Quit() { runtime.Quit(a.ctx) }
 
 // TerminalInfo is the terminal metadata shown in the UI header.
 type TerminalInfo struct {

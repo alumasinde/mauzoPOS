@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Icon } from '@mauzo/ui';
+  import { onMount } from 'svelte';
   import { cart } from '../cart.svelte';
   import { formatMoney } from '../money';
+  import { METHOD_INFO, paymethods } from '../pay/methods.svelte';
 
   type Method = 'cash' | 'mpesa' | 'card' | 'bank' | 'credit';
   let {
@@ -14,13 +16,13 @@
     onaction: (a: string) => void;
   } = $props();
 
-  const methods: { key: Method; label: string; icon: string }[] = [
-    { key: 'cash', label: 'Cash', icon: 'banknote' },
-    { key: 'mpesa', label: 'M-Pesa', icon: 'phone' },
-    { key: 'card', label: 'Card', icon: 'credit-card' },
-    { key: 'bank', label: 'Bank', icon: 'landmark' },
-    { key: 'credit', label: 'Credit', icon: 'book' },
-  ];
+  // Only the methods the shop has switched on; re-read after each sync.
+  const methods = $derived(paymethods.list.map((key) => ({ key, ...METHOD_INFO[key] })));
+
+  onMount(() => void paymethods.load());
+  $effect(() => {
+    if (!paymethods.list.includes(method)) method = paymethods.pick(method);
+  });
 </script>
 
 <footer class="bar">

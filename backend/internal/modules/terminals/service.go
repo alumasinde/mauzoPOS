@@ -18,6 +18,9 @@ type BranchResolver interface {
 // Sentinel errors.
 var (
 	ErrInvalidBranch = httpx.NewError(422, "invalid_branch", "That branch does not exist.")
+	ErrNotFound      = httpx.NewError(404, "terminal_not_found", "Terminal not found.")
+	ErrIsDisabled    = httpx.NewError(409, "terminal_disabled",
+		"This terminal is disabled. Enable it before issuing a code.")
 )
 
 // Service owns terminal business rules.
@@ -49,6 +52,18 @@ type Response struct {
 	ActivatedAt *time.Time `json:"activated_at"`
 	LastSeenAt  *time.Time `json:"last_seen_at"`
 	Online      bool       `json:"online"`
+	// CodeExpiresAt is set while an activation code is waiting (not shown
+	// again — only that one exists and when it lapses).
+	CodeExpiresAt *time.Time `json:"code_expires_at,omitempty"`
+}
+
+// IssuedCode is a freshly minted activation code — shown once.
+type IssuedCode struct {
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
+	// Repair is true when the terminal already has a device: using the code
+	// moves the terminal to the new device and signs the old one out.
+	Repair bool `json:"repair"`
 }
 
 // List returns the tenant's terminals.
@@ -92,21 +107,64 @@ func (s *Service) CreateAt(ctx context.Context, tenantID uint64, req CreateReque
 	return t, nil
 }
 
-// IssueCode mints a one-time activation code (returned once, stored hashed).
-func (s *Service) IssueCode(ctx context.Context, tenantID uint64, publicID string) (string, error) {
+// IssueCode mints a one-time activation code (returned once, stored hashed,
+// valid for ActivationTTL). Issuing again replaces the previous code. For a
+// terminal that already has a device it is a re-pair code.
+func (s *Service) IssueCode(ctx context.Context, tenantID uint64, publicID string, allow func(uint64) bool) (IssuedCode, error) {
 	t, err := s.repo.ByPublicID(ctx, tenantID, publicID)
+	if err != nil || (allow != nil && !allow(t.BranchID)) {
+		return IssuedCode{}, ErrNotFound
+	}
+	if t.Status == StatusDisabled {
+		return IssuedCode{}, ErrIsDisabled
+	}
+	code, err := NewActivationCode()
 	if err != nil {
-		return "", ErrInvalidBranch
+		return IssuedCode{}, err
 	}
-	code, err := security.NewToken()
-	if err != nil {
-		return "", err
+	expires := time.Now().Add(ActivationTTL)
+	if err := s.repo.SetActivationCode(ctx, t.ID, ptr(security.HashToken(NormalizeCode(code))), &expires); err != nil {
+		return IssuedCode{}, err
 	}
-	code = code[:12] // short enough to read off a screen
-	if err := s.repo.SetActivationCode(ctx, t.ID, ptr(security.HashToken(code))); err != nil {
-		return "", err
+	return IssuedCode{Code: code, ExpiresAt: expires, Repair: t.ActivatedAt != nil}, nil
+}
+
+// UpdateRequest renames and/or disables / enables a terminal.
+type UpdateRequest struct {
+	Name   *string `json:"name"`
+	Status *string `json:"status"` // disabled | enabled
+}
+
+// Update applies an UpdateRequest and returns the fresh row.
+func (s *Service) Update(ctx context.Context, tenantID uint64, publicID string, req UpdateRequest,
+	allow func(uint64) bool) (Terminal, error) {
+	t, err := s.repo.ByPublicID(ctx, tenantID, publicID)
+	if err != nil || (allow != nil && !allow(t.BranchID)) {
+		return Terminal{}, ErrNotFound
 	}
-	return code, nil
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" || len(name) > 80 {
+			return Terminal{}, httpx.ErrValidation.WithDetails(map[string]any{"name": "1–80 characters"})
+		}
+		if err := s.repo.Rename(ctx, t.ID, name); err != nil {
+			return Terminal{}, err
+		}
+	}
+	if req.Status != nil {
+		switch *req.Status {
+		case "disabled":
+			err = s.repo.Disable(ctx, t.ID)
+		case "enabled":
+			err = s.repo.Enable(ctx, t.ID)
+		default:
+			return Terminal{}, httpx.ErrValidation.WithDetails(map[string]any{"status": "disabled or enabled"})
+		}
+		if err != nil {
+			return Terminal{}, err
+		}
+	}
+	return s.repo.ByPublicID(ctx, tenantID, publicID)
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -120,5 +178,14 @@ func ToResponse(t Terminal) Response {
 	return Response{ID: t.PublicID, BranchID: t.BranchID, Branch: t.BranchName,
 		Name: t.Name, Status: t.Status, DeviceName: t.DeviceName,
 		ActivatedAt: t.ActivatedAt, LastSeenAt: t.LastSeenAt,
-		Online: t.LastSeenAt != nil && time.Since(*t.LastSeenAt) < onlineWindow}
+		Online:        t.Status == StatusActive && t.LastSeenAt != nil && time.Since(*t.LastSeenAt) < onlineWindow,
+		CodeExpiresAt: liveExpiry(t.CodeExpiresAt)}
+}
+
+// liveExpiry hides a code that has already lapsed.
+func liveExpiry(t *time.Time) *time.Time {
+	if t == nil || time.Now().After(*t) {
+		return nil
+	}
+	return t
 }

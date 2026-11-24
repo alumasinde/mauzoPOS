@@ -13,9 +13,7 @@ import (
 	"mauzo/internal/modules/users"
 )
 
-// Foundation seeds the first platform super admin and a demo tenant with an
-// owner account so a fresh development database is immediately usable.
-// Development only — skipped when APP_ENV is anything else.
+// Foundation seeds the base reference data every environment needs.
 type Foundation struct{}
 
 // Name implements Seeder.
@@ -63,7 +61,7 @@ func (Foundation) Seed(ctx context.Context, conn *sqlx.DB) error {
 		return err
 	}
 	usvc := users.NewUserService(users.NewUserRepo(conn), params, users.Deps{
-		Roles: roleSvc, Branches: branches.NewService(branches.NewRepo(conn)),
+		Roles: roleSvc, Branches: branches.NewService(conn, branches.NewRepo(conn)),
 	})
 	_, err := usvc.CreateTenantUser(ctx, tenant.ID,
 		"Owner", "owner@demo.local", "", "ChangeMe123!", authz.RoleOwner)

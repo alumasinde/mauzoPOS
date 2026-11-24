@@ -205,7 +205,7 @@ func (r *Repo) List(ctx context.Context, tenantID uint64, f ListFilter, page, pe
 		`SELECT COUNT(*) FROM mpesa_transactions WHERE `+w, args...); err != nil {
 		return nil, 0, err
 	}
-	var rows []Transaction
+	rows := []Transaction{}
 	err := r.db.SelectContext(ctx, &rows,
 		`SELECT * FROM mpesa_transactions WHERE `+w+
 			` ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
@@ -216,7 +216,7 @@ func (r *Repo) List(ctx context.Context, tenantID uint64, f ListFilter, page, pe
 // Unallocated returns successful transactions awaiting allocation — the till
 // feed and the reconciliation queue read this.
 func (r *Repo) Unallocated(ctx context.Context, tenantID uint64, since time.Time) ([]Transaction, error) {
-	var rows []Transaction
+	rows := []Transaction{}
 	err := r.db.SelectContext(ctx, &rows,
 		`SELECT * FROM mpesa_transactions
 		 WHERE tenant_id=? AND status='success' AND allocated_sale_id IS NULL AND created_at >= ?
@@ -349,7 +349,7 @@ func LogEvent(ctx context.Context, db sqlx.ExtContext, tenantID uint64, txnID *u
 
 // Events returns the raw-callback audit trail for a transaction.
 func (r *Repo) Events(ctx context.Context, tenantID, txnID uint64) ([]Event, error) {
-	var rows []Event
+	rows := []Event{}
 	err := r.db.SelectContext(ctx, &rows,
 		`SELECT * FROM mpesa_events WHERE tenant_id=? AND txn_id=? ORDER BY id`, tenantID, txnID)
 	return rows, err

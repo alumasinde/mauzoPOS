@@ -68,9 +68,7 @@ func (s *Service) HandleSTKCallback(ctx context.Context, tenantID uint64, raw []
 		return
 	}
 	t.Status, t.TransID, t.Phone, t.TransTime = status, transPtr, phone, transTime
-	if status == StSuccess {
-		s.feed.publish(tenantID, feedEvent{Kind: "collection", Txn: t})
-	}
+	s.publishSTK(tenantID, t)
 }
 
 // HandleC2BConfirmation processes a confirmed customer payment. Dedupe is by
@@ -103,8 +101,12 @@ func (s *Service) HandleC2BConfirmation(ctx context.Context, tenantID uint64, ra
 		return
 	}
 	transTime := p.Time()
+	branchID, err := s.repo.BranchForShortCode(ctx, tenantID, p.BusinessShortCode)
+	if err != nil {
+		slog.Warn("mpesa: branch lookup failed", "tenant", tenantID, "err", err)
+	}
 	t := &Transaction{
-		TenantID: tenantID, PublicID: security.NewPublicID(), Kind: KindC2B,
+		TenantID: tenantID, PublicID: security.NewPublicID(), Kind: KindC2B, BranchID: branchID,
 		Status: StSuccess, TransID: &p.TransID, Phone: p.MSISDN,
 		PayerName: p.Payer(), Amount: amount, AccountRef: p.BillRefNumber,
 		ShortCode: p.BusinessShortCode, ResultCode: intPtr(0), TransTime: &transTime,

@@ -53,6 +53,7 @@ type Status struct {
 	LastSync     string `json:"last_sync"`
 	Printer      string `json:"printer"` // none | ready | not_configured
 	PendingSales int    `json:"pending_sales"`
+	FailedSales  int    `json:"failed_sales"` // refused on upload — needs attention
 }
 
 // Status returns connectivity + sync state for the header.
@@ -67,6 +68,7 @@ func (a *App) Status() Status {
 	var n int
 	_ = a.db.GetContext(a.ctx, &n, `SELECT COUNT(*) FROM pending_sales WHERE uploaded = 0`)
 	st.PendingSales = n
+	st.FailedSales, _ = a.db.FailedCount(a.ctx)
 	return st
 }
 

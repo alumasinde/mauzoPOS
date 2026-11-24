@@ -17,4 +17,5 @@ var (
 	ErrBadKind          = httpx.NewError(422, "mpesa_bad_kind", "short_code_kind must be 'till' or 'paybill'.")
 	ErrBranchMismatch   = httpx.NewError(422, "mpesa_branch_mismatch", "This collection was taken at a different branch.")
 	ErrSaleNotPayable   = httpx.NewError(422, "mpesa_sale_not_payable", "Only completed sales can receive an M-Pesa allocation.")
+	ErrInvalidShortCode = httpx.NewError(422, "mpesa_invalid_short_code", "Each till / store number must be digits and listed once.")
 )

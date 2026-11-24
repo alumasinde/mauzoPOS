@@ -2,6 +2,7 @@ package branches
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jmoiron/sqlx"
 
@@ -62,4 +63,26 @@ func (r *Repo) Create(ctx context.Context, b *Branch) error {
 	}
 	*b = fresh
 	return nil
+}
+
+// Update writes an edited branch inside tx.
+func (r *Repo) Update(ctx context.Context, tx *sqlx.Tx, b Branch) error {
+	res, err := tx.ExecContext(ctx,
+		`UPDATE branches SET code=?, name=?, phone=?, location=?, status=?, is_main=?
+		 WHERE id=? AND tenant_id=?`,
+		b.Code, b.Name, b.Phone, b.Location, b.Status, b.IsMain, b.ID, b.TenantID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// ClearMain un-mains every branch except the one just made main.
+func (r *Repo) ClearMain(ctx context.Context, tx *sqlx.Tx, tenantID, keepID uint64) error {
+	_, err := tx.ExecContext(ctx,
+		`UPDATE branches SET is_main=0 WHERE tenant_id=? AND id<>?`, tenantID, keepID)
+	return err
 }

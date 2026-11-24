@@ -13,7 +13,7 @@ import (
 type TerminalSettings struct {
 	DeviceName      string `json:"device_name"`
 	APIURL          string `json:"api_url"`
-	PrinterKind     string `json:"printer_kind"` // none | windows | network | file
+	PrinterKind     string `json:"printer_kind"` // none | windows | network | pdf | file
 	PrinterName     string `json:"printer_name"` // installed printer (windows) or file path
 	PrinterHost     string `json:"printer_host"`
 	PrinterPort     int    `json:"printer_port"`
@@ -103,7 +103,7 @@ func (a *App) SaveSettings(s TerminalSettings) error {
 		return errors.New("local database not ready")
 	}
 	switch s.PrinterKind {
-	case printing.KindNone, printing.KindWindows, printing.KindNetwork, printing.KindFile:
+	case printing.KindNone, printing.KindWindows, printing.KindNetwork, printing.KindFile, printing.KindPDF:
 	case "":
 		s.PrinterKind = printing.KindNone
 	default:

@@ -15,9 +15,22 @@ import (
 var ErrOffline = errors.New("offline")
 
 // apiError surfaces the server's error payload.
-type apiError struct{ msg string }
+type apiError struct {
+	msg    string
+	status int
+}
 
 func (e *apiError) Error() string { return e.msg }
+
+// refused reports a definitive rejection of the request itself (4xx other
+// than auth, timeouts and rate limits) — retrying the same body cannot help.
+func (e *apiError) refused() bool {
+	switch e.status {
+	case 401, 403, 408, 429:
+		return false
+	}
+	return e.status >= 400 && e.status < 500
+}
 
 // request performs one API call; when the device is activated it attaches the
 // bearer token. Network failures map to ErrOffline so callers can degrade to
@@ -58,9 +71,9 @@ func (a *App) request(method, path string, body any, out any) error {
 			} `json:"error"`
 		}
 		if json.Unmarshal(raw, &env) == nil && env.Error.Message != "" {
-			return &apiError{msg: env.Error.Message}
+			return &apiError{msg: env.Error.Message, status: res.StatusCode}
 		}
-		return &apiError{msg: fmt.Sprintf("HTTP %d", res.StatusCode)}
+		return &apiError{msg: fmt.Sprintf("HTTP %d", res.StatusCode), status: res.StatusCode}
 	}
 	if out == nil || res.StatusCode == http.StatusNoContent {
 		return nil

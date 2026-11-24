@@ -17,6 +17,7 @@
   import Modals from './lib/components/Modals.svelte';
   import LockScreen from './lib/components/LockScreen.svelte';
   import SettingsScreen from './lib/components/SettingsScreen.svelte';
+  import { shift, refreshShift } from './lib/shift.svelte';
 
   type Screen = 'boot' | 'browser' | 'activate' | 'login' | 'pin' | 'checkout' | 'settings';
 
@@ -119,6 +120,13 @@
       locked = false;
       screen = 'checkout';
       startScanner();
+      // Soft shift gate: prompt for the float when this till has no open
+      // shift. Skippable — offline tills and un-shifted selling still work.
+      void refreshShift().then(() => {
+        if (pulse.status?.online && shift.checked && !shift.current) {
+          modals?.open('shiftopen');
+        }
+      });
     } catch (e) {
       pinError = e instanceof Error ? e.message : 'Wrong PIN';
     } finally {
@@ -162,7 +170,7 @@
   window.addEventListener('pos:held', () => modals?.open('held'));
 
   function onKeydown(e: KeyboardEvent) {
-    if (screen !== 'checkout' || locked) return;
+    if (screen !== 'checkout' || locked || modals?.isOpen()) return;
     posKeydown(e, action);
   }
 
@@ -232,6 +240,7 @@
       status={pulse.status}
       {now}
       onsync={() => void pulse.sync()}
+      onmpesa={() => modals?.open('mpesa')}
       onsettings={() => (screen = 'settings')}
       onlock={lock}
     />

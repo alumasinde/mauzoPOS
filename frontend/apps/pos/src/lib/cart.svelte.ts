@@ -25,6 +25,7 @@ function newCart() {
   let grant = $state('');
   let customerID = $state('');
   let customerName = $state('');
+  let customerPhone = $state('');
   // M-Pesa code picked from the collection feed — seeds the mpesa row's
   // reference in the next PayModal.
   let mpesaRef = $state('');
@@ -76,15 +77,20 @@ function newCart() {
     get customerName() {
       return customerName;
     },
+    /** Phone of the attached customer — prefills the M-Pesa prompt. */
+    get customerPhone() {
+      return customerPhone;
+    },
     get mpesaRef() {
       return mpesaRef;
     },
     set mpesaRef(v: string) {
       mpesaRef = v;
     },
-    setCustomer(id: string, name: string) {
+    setCustomer(id: string, name: string, phone = '') {
       customerID = id;
       customerName = name;
+      customerPhone = phone;
     },
 
     select(i: number) {
@@ -155,6 +161,7 @@ function newCart() {
       grant = '';
       customerID = '';
       customerName = '';
+      customerPhone = '';
       mpesaRef = '';
     },
 

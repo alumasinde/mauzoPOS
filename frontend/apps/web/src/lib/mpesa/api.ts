@@ -55,12 +55,21 @@ export interface MpesaCandidate {
   reference: string;
   sold_at: string;
   allocated: boolean;
+  /** An M-Pesa code typed at an offline till that has not matched yet. */
+  unverified?: boolean;
+}
+
+/** Till / store number → branch. */
+export interface BranchTill {
+  short_code: string;
+  branch_id: string;
+  branch_name: string;
 }
 
 export interface MpesaSuggestion {
   txn: MpesaTxn;
   candidate: MpesaCandidate;
-  strength: string; // strong | weak
+  strength: string; // strong | weak | unverified (offline-typed code awaiting its payment)
 }
 
 export interface MpesaConfig {
@@ -75,6 +84,7 @@ export interface MpesaConfig {
   has_consumer_secret: boolean;
   has_passkey: boolean;
   has_security_credential: boolean;
+  secrets_unreadable?: boolean;
   stk_callback_url: string;
   c2b_confirmation_url: string;
   c2b_validation_url: string;
@@ -123,4 +133,7 @@ export const mpesaApi = {
   saveConfig: (c: Partial<MpesaConfig>) => api.put('/api/v1/t/mpesa/config', c),
   registerC2B: () => api.post('/api/v1/t/mpesa/config/register', {}),
   testPush: (phone: string) => api.post('/api/v1/t/mpesa/test', { phone }),
+  branchTills: () => api.get<BranchTill[]>('/api/v1/t/mpesa/branch-tills'),
+  saveBranchTills: (tills: { short_code: string; branch_id: string }[]) =>
+    api.put<BranchTill[]>('/api/v1/t/mpesa/branch-tills', { tills }),
 };

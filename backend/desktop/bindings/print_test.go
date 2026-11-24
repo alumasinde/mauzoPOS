@@ -93,7 +93,7 @@ func TestOfflineSalePrintsProvisionalReceipt(t *testing.T) {
 	if !bytes.Contains([]byte(job), []byte{0x1B, 'p', 0, 25, 250}) {
 		t.Error("cash sale did not kick the drawer")
 	}
-	if err := app.PrintLast(); err == nil {
+	if _, err := app.PrintLast(); err == nil {
 		t.Fatal("PrintLast after auto-print must refuse (copies are audited reprints)")
 	}
 }
@@ -131,13 +131,13 @@ func TestOnlineSalePrintsServerSnapshot(t *testing.T) {
 	if _, err := os.Stat(out); err == nil {
 		t.Fatal("printed although auto-print is off")
 	}
-	if err := app.PrintLast(); err != nil {
+	if _, err := app.PrintLast(); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(printed(t, out), "SERVER RECEIPT 77") {
 		t.Fatal("server snapshot not printed")
 	}
-	if err := app.PrintLast(); err == nil {
+	if _, err := app.PrintLast(); err == nil {
 		t.Fatal("second PrintLast must refuse")
 	}
 	rp, err := app.Reprint("77", "")

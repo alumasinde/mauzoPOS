@@ -327,3 +327,40 @@ func (h *Handler) ReversalHook(w http.ResponseWriter, r *http.Request) {
 	h.svc.HandleReversalResult(r.Context(), tenantID, body)
 	httpx.JSON(w, http.StatusOK, daraja.Ack)
 }
+
+// BranchTills handles GET /t/mpesa/branch-tills — till / store number → branch.
+func (h *Handler) BranchTills(w http.ResponseWriter, r *http.Request) {
+	a, ok := identity.ActorFrom(r.Context())
+	if !ok || a.TenantID == 0 {
+		httpx.WriteError(w, r, httpx.ErrForbidden)
+		return
+	}
+	rows, err := h.svc.BranchTills(r.Context(), a.TenantID)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.OK(w, rows)
+}
+
+// SetBranchTills handles PUT /t/mpesa/branch-tills — replaces the mapping.
+func (h *Handler) SetBranchTills(w http.ResponseWriter, r *http.Request) {
+	a, ok := identity.ActorFrom(r.Context())
+	if !ok || a.TenantID == 0 {
+		httpx.WriteError(w, r, httpx.ErrForbidden)
+		return
+	}
+	var in struct {
+		Tills []BranchTillInput `json:"tills"`
+	}
+	if err := httpx.Decode(w, r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	rows, err := h.svc.SetBranchTills(r.Context(), a.TenantID, in.Tills)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.OK(w, rows)
+}

@@ -3,6 +3,7 @@ package bindings
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,7 +30,8 @@ type printState struct {
 	probe     string
 	last      *receiptfmt.Output // original receipt of the last sale
 	lastCash  bool
-	lastShown bool // already printed (further copies must be audited reprints)
+	lastShown bool   // already printed (further copies must be audited reprints)
+	lastName  string // file name for a PDF copy
 }
 
 // printerConfig reads the terminal's printer from local meta. A printer name
@@ -104,11 +106,21 @@ func (a *App) autoPrint(k receiptfmt.Kit) bool {
 }
 
 // printOutput sends copies of a receipt, kicking the drawer on the first one
-// when asked.
-func (a *App) printOutput(out receiptfmt.Output, copies int, drawer bool) error {
+// when asked. A till without a receipt printer (or set to a Windows PDF/XPS
+// printer, which cannot take ESC/POS) gets one PDF, saved and opened; the
+// path is returned.
+func (a *App) printOutput(out receiptfmt.Output, name string, copies int, drawer bool) (string, error) {
 	cfg := a.printerConfig()
 	if !cfg.Configured() {
-		return printing.ErrNotConfigured
+		return "", printing.ErrNotConfigured
+	}
+	if cfg.SavesPDF() {
+		path, err := printing.SavePDF(name, receiptfmt.EncodePDF(out))
+		if err != nil {
+			return "", err
+		}
+		_ = printing.Open(path) // saved is enough; a missing viewer is not an error
+		return path, nil
 	}
 	k := a.kit()
 	if copies < 1 {
@@ -120,10 +132,22 @@ func (a *App) printOutput(out receiptfmt.Output, copies int, drawer bool) error 
 		})
 		if err := printing.Send(cfg, job); err != nil {
 			a.resetProbe()
-			return err
+			return "", err
 		}
 	}
-	return nil
+	return "", nil
+}
+
+// receiptName names a PDF copy of a sale's receipt.
+func receiptName(res *PayResult) string {
+	if res.ReceiptNo > 0 {
+		return "receipt-" + strconv.FormatUint(res.ReceiptNo, 10)
+	}
+	id := res.SaleID
+	if len(id) > 8 {
+		id = id[len(id)-8:]
+	}
+	return "provisional-" + id
 }
 
 // afterSale remembers the sale's receipt and prints it when the policy says
@@ -134,17 +158,19 @@ func (a *App) afterSale(res *PayResult, out *receiptfmt.Output, hasCash bool) {
 	}
 	a.print.mu.Lock()
 	a.print.last, a.print.lastCash, a.print.lastShown = out, hasCash, false
+	a.print.lastName = receiptName(res)
 	a.print.mu.Unlock()
 	res.CanPrint = true
 	k := a.kit()
 	if !a.autoPrint(k) {
 		return
 	}
-	if err := a.printOutput(*out, k.Policy.Copies, hasCash && k.Policy.OpenDrawer); err != nil {
+	file, err := a.printOutput(*out, receiptName(res), k.Policy.Copies, hasCash && k.Policy.OpenDrawer)
+	if err != nil {
 		res.PrintError = err.Error()
 		return
 	}
-	res.Printed = true
+	res.Printed, res.ReceiptFile = true, file
 	a.print.mu.Lock()
 	a.print.lastShown = true
 	a.print.mu.Unlock()
@@ -152,25 +178,27 @@ func (a *App) afterSale(res *PayResult, out *receiptfmt.Output, hasCash bool) {
 
 // PrintLast prints the original receipt of the last sale when it has not
 // been printed yet (auto-print off, or the printer was down). Once printed,
-// further copies are reprints and go through Reprint (audited).
-func (a *App) PrintLast() error {
+// further copies are reprints and go through Reprint (audited). It returns
+// the saved file when the till prints to PDF.
+func (a *App) PrintLast() (string, error) {
 	a.print.mu.Lock()
-	out, cash, shown := a.print.last, a.print.lastCash, a.print.lastShown
+	out, cash, shown, name := a.print.last, a.print.lastCash, a.print.lastShown, a.print.lastName
 	a.print.mu.Unlock()
 	if out == nil {
-		return errors.New("no receipt to print")
+		return "", errors.New("no receipt to print")
 	}
 	if shown {
-		return errors.New("already printed - use Reprint for another copy")
+		return "", errors.New("already printed - use Reprint for another copy")
 	}
 	k := a.kit()
-	if err := a.printOutput(*out, k.Policy.Copies, cash && k.Policy.OpenDrawer); err != nil {
-		return err
+	file, err := a.printOutput(*out, name, k.Policy.Copies, cash && k.Policy.OpenDrawer)
+	if err != nil {
+		return "", err
 	}
 	a.print.mu.Lock()
 	a.print.lastShown = true
 	a.print.mu.Unlock()
-	return nil
+	return file, nil
 }
 
 // ReprintResult is what the UI shows after a reprint.
@@ -178,6 +206,7 @@ type ReprintResult struct {
 	CopyNo  int    `json:"copy_no"`
 	Printed bool   `json:"printed"`
 	Error   string `json:"error,omitempty"`
+	File    string `json:"file,omitempty"` // saved PDF, when printing to PDF
 }
 
 // Reprint asks the server for an audited copy of a receipt of this branch
@@ -199,10 +228,11 @@ func (a *App) Reprint(ref, grant string) (ReprintResult, error) {
 		return ReprintResult{}, err
 	}
 	res := ReprintResult{CopyNo: out.CopyNo}
-	if perr := a.printOutput(out.Output, 1, false); perr != nil {
+	name := "receipt-" + ref + "-copy-" + strconv.Itoa(out.CopyNo)
+	if file, perr := a.printOutput(out.Output, name, 1, false); perr != nil {
 		res.Error = perr.Error()
 	} else {
-		res.Printed = true
+		res.Printed, res.File = true, file
 	}
 	return res, nil
 }
@@ -219,7 +249,8 @@ func (a *App) TestPrint() error {
 		doc.Extra = base.Extra
 	}
 	doc.Flags.HasLogo = base.Flags.HasLogo
-	return a.printOutput(receiptfmt.Render(k.ParsedTemplate(), doc), 1, false)
+	_, err := a.printOutput(receiptfmt.Render(k.ParsedTemplate(), doc), "test-print", 1, false)
+	return err
 }
 
 // OpenDrawer pulses the cash drawer through the receipt printer.
@@ -228,7 +259,25 @@ func (a *App) OpenDrawer() error {
 	if !cfg.Configured() {
 		return printing.ErrNotConfigured
 	}
+	if cfg.SavesPDF() {
+		return errors.New("no cash drawer: receipts are saved as PDF on this till")
+	}
 	return printing.Send(cfg, []byte{0x1B, '@', 0x1B, 'p', 0, 25, 250})
+}
+
+// OpenReceiptFile reopens a saved PDF receipt. Only files inside the
+// receipts folder can be opened, so the WebView cannot launch anything else.
+func (a *App) OpenReceiptFile(path string) error {
+	dir, err := printing.ReceiptsDir()
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(dir, filepath.Clean(path))
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) ||
+		!strings.EqualFold(filepath.Ext(path), ".pdf") {
+		return errors.New("not a saved receipt")
+	}
+	return printing.Open(path)
 }
 
 // ListPrinters returns the printers installed in Windows.

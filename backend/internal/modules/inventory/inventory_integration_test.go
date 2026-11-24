@@ -60,7 +60,7 @@ func setup(t *testing.T) fixture {
 	}
 	taxRepo := catalog.NewTaxonomyRepo(conn)
 	catSvc := catalog.NewService(conn, catalog.NewProductRepo(conn), taxRepo, images)
-	branchSvc := branches.NewService(branches.NewRepo(conn))
+	branchSvc := branches.NewService(conn, branches.NewRepo(conn))
 	svc := inventory.NewService(conn, inventory.NewRepo(conn),
 		inventory.NewDocsRepo(conn), catSvc, branchSvc)
 

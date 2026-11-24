@@ -17,12 +17,16 @@ import (
 	"mauzo/internal/core/security"
 	"mauzo/internal/modules/mpesa"
 	"mauzo/internal/modules/sales"
+	"mauzo/internal/modules/shifts"
+	"mauzo/internal/modules/terminals"
 )
 
 // Sentinel errors.
 var (
 	ErrBadActivationCode = httpx.NewError(422, "bad_activation_code",
-		"That activation code is invalid or already used.")
+		"That code is not valid. Check it on the back-office screen (letters and digits, e.g. ABCDE-FGH23) — or issue a new one.")
+	ErrActivationExpired = httpx.NewError(422, "activation_code_expired",
+		"That code has expired. Issue a new one in the back office (Team & access → POS terminals).")
 	ErrTerminalDisabled = httpx.NewError(403, "terminal_disabled", "This terminal is disabled.")
 	ErrBadPIN           = httpx.NewError(401, "bad_pin", "Wrong PIN.")
 	ErrPINLocked        = httpx.NewError(429, "pin_locked", "Too many wrong PINs. Try again shortly.")
@@ -42,6 +46,7 @@ type Service struct {
 	sales    Sales
 	receipts Receipts
 	mpesa    Mpesa
+	shifts   Shifts
 
 	mu     sync.Mutex
 	fails  map[uint64]*pinFail
@@ -78,9 +83,23 @@ type Mpesa interface {
 	InitiateSTK(ctx context.Context, tenantID, branchID, byUserID uint64,
 		phone, accountRef, note string, amount decimal.Decimal) (*mpesa.Transaction, error)
 	STKStatus(ctx context.Context, tenantID uint64, publicID string) (*mpesa.Transaction, error)
-	FeedSince(ctx context.Context, tenantID uint64) ([]mpesa.Transaction, error)
-	ServeFeed(w http.ResponseWriter, r *http.Request, tenantID uint64)
+	FeedForTill(ctx context.Context, tenantID, branchID uint64) ([]mpesa.Transaction, error)
+	ServeFeed(w http.ResponseWriter, r *http.Request, tenantID, branchID uint64)
 	Allocate(ctx context.Context, tenantID, actorID uint64, txnPublicID, salePublicID string) error
+}
+
+// BindShifts attaches the shifts service (nil when the module is disabled).
+func (s *Service) BindShifts(v Shifts) { s.shifts = v }
+
+// Shifts is the drawer-session surface the till uses.
+type Shifts interface {
+	Current(ctx context.Context, tenantID, terminalID uint64) (*shifts.Shift, error)
+	Open(ctx context.Context, in shifts.OpenInput) (*shifts.Shift, error)
+	AddMovement(ctx context.Context, in shifts.MovementInput) (*shifts.Movement, error)
+	DrawerOpen(ctx context.Context, tenantID, branchID, terminalID, cashierID uint64) error
+	Report(ctx context.Context, sh shifts.Shift) (*shifts.Report, error)
+	ReportByPublic(ctx context.Context, tenantID uint64, publicID string) (*shifts.Report, error)
+	Close(ctx context.Context, in shifts.CloseInput) (*shifts.Report, error)
 }
 
 // ---- activation --------------------------------------------------------------
@@ -110,16 +129,22 @@ type Terminal struct {
 
 // Activate validates the one-time code and mints the device token.
 func (s *Service) Activate(ctx context.Context, req ActivateRequest) (Activation, error) {
-	if len(req.Code) < 6 || req.DeviceID == "" {
+	code := terminals.NormalizeCode(req.Code)
+	if len(code) < 6 || req.DeviceID == "" {
 		return Activation{}, ErrBadActivationCode
 	}
-	row, err := s.repo.terminalByCodeHash(ctx, security.HashToken(req.Code))
+	row, err := s.repo.terminalByCodeHash(ctx, security.HashToken(code))
 	if err != nil {
 		return Activation{}, ErrBadActivationCode
 	}
-	if row.ActivatedAt != nil {
-		return Activation{}, ErrBadActivationCode
+	if row.Status == "disabled" {
+		return Activation{}, ErrTerminalDisabled
 	}
+	if row.CodeExpiresAt != nil && time.Now().After(*row.CodeExpiresAt) {
+		return Activation{}, ErrActivationExpired
+	}
+	// A terminal that already had a device is being re-paired (new PC,
+	// reinstall): the new device takes over and the old token stops working.
 	token, err := security.NewToken()
 	if err != nil {
 		return Activation{}, err

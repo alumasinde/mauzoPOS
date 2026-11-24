@@ -21,6 +21,8 @@ type SaleRequest struct {
 	Payments        []sales.PaymentInput `json:"payments"`
 	SupervisorGrant string               `json:"supervisor_grant"`
 	DiscountNote    string               `json:"discount_note"`
+	// Offline is set by the till on sales it completed while disconnected.
+	Offline bool `json:"offline"`
 }
 
 // Sale handles POST /pos/sales. Idempotent on idempotency_key — a retried
@@ -71,7 +73,7 @@ func (h *Handler) Sale(w http.ResponseWriter, r *http.Request) {
 		IdempotencyKey: req.IdempotencyKey, Source: sales.SourcePOS, SoldAt: soldAt,
 		Lines: req.Lines, OrderDiscount: req.OrderDiscount, Payments: req.Payments,
 		ActorID: cashierID, ActorType: "user", SupervisorID: supervisorID,
-		DiscountNote: req.DiscountNote,
+		DiscountNote: req.DiscountNote, Offline: req.Offline,
 	})
 	if err != nil {
 		httpx.WriteError(w, r, err)

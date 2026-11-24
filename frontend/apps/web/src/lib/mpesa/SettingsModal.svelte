@@ -6,6 +6,7 @@
   import { Button, Icon, Modal, Select, TextField, toast } from '@mauzo/ui';
   import { onMount } from 'svelte';
   import { mpesaApi, type MpesaConfig } from './api';
+  import BranchTills from './BranchTills.svelte';
 
   let { open = $bindable(false), onsaved }: { open: boolean; onsaved: () => void } = $props();
 
@@ -95,6 +96,12 @@
 
 <Modal bind:open title="M-Pesa (Daraja) settings" size="lg">
   {#if cfg}
+    {#if cfg.secrets_unreadable}
+      <p class="warn">
+        Stored credentials can no longer be read (encryption key changed). Re-enter them below and
+        save — existing secrets will be replaced.
+      </p>
+    {/if}
     <div class="cols">
       <div class="field">
         <label for="env">Environment</label>
@@ -176,6 +183,8 @@
       {/if}
     </div>
 
+    <BranchTills />
+
     <h4>Test the setup</h4>
     <div class="testrow">
       <input bind:value={testPhone} inputmode="tel" placeholder="Phone — 07XXXXXXXX" />
@@ -213,6 +222,15 @@
     font-size: var(--text-xs);
     color: var(--color-text-muted);
     margin: var(--space-1) 0 var(--space-3);
+  }
+  .warn {
+    font-size: var(--text-sm);
+    color: var(--color-warning, #b45309);
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    border: 1px solid var(--color-warning, #b45309);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    margin: 0 0 var(--space-3);
   }
   h4 {
     margin: var(--space-4) 0 var(--space-2);

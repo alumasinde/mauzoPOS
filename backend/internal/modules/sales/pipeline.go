@@ -228,11 +228,11 @@ func (s *Service) validatePayments(ctx context.Context, tenantID uint64, custome
 	change := decimal.Zero
 	fields := map[string]any{}
 	credit := decimal.Zero
+	if err := s.checkMethods(ctx, tenantID, in); err != nil {
+		return nil, change, err
+	}
 	for i, pi := range in {
-		spec, ok := methods[pi.Method]
-		if !ok {
-			return nil, change, ErrUnknownMethod
-		}
+		spec := methods[pi.Method]
 		amt, err := decimal.NewFromString(pi.Amount)
 		if err != nil || amt.LessThanOrEqual(decimal.Zero) {
 			fields["payments."+strconv.Itoa(i)+".amount"] = "invalid"

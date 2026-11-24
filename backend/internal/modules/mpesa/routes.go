@@ -20,6 +20,8 @@ func TenantRoutes(r chi.Router, h *Handler) {
 		r.With(mw.Can(PermConfigManage)).Put("/config", h.SaveConfig)
 		r.With(mw.Can(PermConfigManage)).Post("/config/register", h.RegisterC2B)
 		r.With(mw.Can(PermConfigManage)).Post("/test", h.TestPush)
+		r.With(mw.Can(PermConfigManage)).Get("/branch-tills", h.BranchTills)
+		r.With(mw.Can(PermConfigManage)).Put("/branch-tills", h.SetBranchTills)
 	})
 }
 

@@ -87,6 +87,7 @@
           <option value="none">No printer</option>
           <option value="windows">Installed in Windows (USB / Bluetooth)</option>
           <option value="network">Network (Ethernet / Wi-Fi)</option>
+          <option value="pdf">No receipt printer — save receipts as PDF</option>
           {#if s.printer_kind === 'file'}<option value="file">File (support)</option>{/if}
         </select>
       </label>
@@ -101,10 +102,19 @@
             {/if}
           </select>
         </label>
-        <p class="hint">
-          Install the printer's driver (or Windows "Generic / Text Only"). Receipts are sent raw, so driver
-          paper settings do not matter.
-        </p>
+        {#if /pdf|xps|onenote|fax|document writer/i.test(s.printer_name)}
+          <p class="hint warn">
+            “{s.printer_name}” makes files, not paper. Receipts will be saved as PDF in Documents\Mauzo
+            Receipts and opened — choose your thermal receipt printer to print on paper.
+          </p>
+        {:else}
+          <p class="hint">
+            Install the printer's driver (or Windows "Generic / Text Only"). Receipts are sent raw, so driver
+            paper settings do not matter.
+          </p>
+        {/if}
+      {:else if s.printer_kind === 'pdf'}
+        <p class="hint">Each receipt is saved as a PDF in Documents\Mauzo Receipts and opened for you.</p>
       {:else if s.printer_kind === 'network'}
         <div class="two">
           <label>IP address <input bind:value={s.printer_host} placeholder="192.168.1.50" /></label>
@@ -125,7 +135,9 @@
           <button class="ghost" onclick={testPrint} disabled={testing}>
             {testing ? 'Printing…' : 'Print test receipt'}
           </button>
-          <button class="ghost" onclick={kickDrawer}>Open cash drawer</button>
+          {#if s.printer_kind !== 'pdf'}
+            <button class="ghost" onclick={kickDrawer}>Open cash drawer</button>
+          {/if}
         </div>
       {/if}
     </fieldset>
@@ -206,6 +218,12 @@
     margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
     color: var(--color-text-muted);
+  }
+  .hint.warn {
+    padding: var(--space-2);
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+    border-radius: var(--radius-sm);
   }
   .row.tight {
     justify-content: flex-start;

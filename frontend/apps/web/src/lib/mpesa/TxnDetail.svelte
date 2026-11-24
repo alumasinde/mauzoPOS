@@ -159,6 +159,7 @@
                 {s.candidate.cashier_name || 'till'} · KSh {formatMoney(s.candidate.mpesa_amount)}
               </span>
               {#if s.strength === 'weak'}<Badge>amount only</Badge>{/if}
+              {#if s.strength === 'unverified'}<Badge tone="warning">offline code</Badge>{/if}
               <Button size="sm" onclick={() => link(s.candidate.public_id)} disabled={busy}>Allocate</Button>
             </div>
           {/each}

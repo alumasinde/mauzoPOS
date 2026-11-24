@@ -1,16 +1,24 @@
 <script lang="ts">
+  // Payment drawer from the right, over the product grid, so the cart stays in
+  // view: amount due (big), method cards, the method's panel, Complete.
+  // Cash is one tap on the note given; M-Pesa opens on the payments that just
+  // reached this till. Keys: F1–F4 method, Enter complete, Esc back.
   import { Icon } from '@mauzo/ui';
-  // Tender/payment modal — builds the payments array, picks a customer for
-  // credit sales, then posts through the desktop bridge (online-first, queued
-  // offline). Shows the receipt number + change on success.
-  import { untrack } from 'svelte';
-  import { desktop, type PayResult } from '../desktop';
+  import { onMount, untrack } from 'svelte';
   import { cart } from '../cart.svelte';
+  import { desktop, type PayResult } from '../desktop';
   import { formatMoney } from '../money';
-  import CustomerPick from './CustomerPick.svelte';
-  import PaidDone from './PaidDone.svelte';
-  import MpesaPay from './MpesaPay.svelte';
   import { mpesafeed } from '../mpesafeed.svelte';
+  import CashPanel from '../pay/CashPanel.svelte';
+  import CustomerLine from '../pay/CustomerLine.svelte';
+  import DrawerHeader from '../pay/DrawerHeader.svelte';
+  import MpesaPanel from '../pay/MpesaPanel.svelte';
+  import OtherPanel from '../pay/OtherPanel.svelte';
+  import MethodTabs from '../pay/MethodTabs.svelte';
+  import Summary from '../pay/Summary.svelte';
+  import { paymethods } from '../pay/methods.svelte';
+  import { type Method, Tender, fromCents, toCents } from '../pay/tender.svelte';
+  import { pulse } from '../pulse.svelte';
 
   let {
     currency = 'KSh',
@@ -25,107 +33,46 @@
   } = $props();
 
   const bridge = desktop();
-  const METHODS: { key: string; label: string; ref: boolean; tendered: boolean }[] = [
-    { key: 'cash', label: 'Cash', ref: false, tendered: true },
-    { key: 'mpesa', label: 'M-Pesa', ref: true, tendered: false },
-    { key: 'card', label: 'Card', ref: true, tendered: false },
-    { key: 'bank', label: 'Bank', ref: true, tendered: false },
-    { key: 'credit', label: 'Credit', ref: false, tendered: false },
-  ];
-
-  interface PayRow {
-    method: string;
-    amount: string;
-    tendered: string;
-    reference: string;
-  }
-
-  let rows = $state<PayRow[]>(
-    untrack(() => [
-      {
-        method,
-        amount: '',
-        tendered: '',
-        reference: method === 'mpesa' ? cart.mpesaRef : '',
-      },
-    ]),
-  );
+  const tender = new Tender(untrack(() => toCents(cart.totals.total)));
+  const methods = $derived(paymethods.list);
+  let active = $state<Method>(untrack(() => paymethods.pick(method)));
   let busy = $state(false);
   let error = $state('');
-  let done = $state<PayResult | null>(null);
+  let cash = $state<CashPanel | null>(null);
 
-  const totalNum = $derived(Number(cart.totals.total) || 0);
-  const paidNum = $derived(rows.reduce((n, r) => n + (Number(r.amount) || 0), 0));
-  const remaining = $derived(Math.max(0, totalNum - paidNum));
-  const tenderedTotal = $derived(
-    rows.reduce((n, r) => n + (r.method === 'cash' ? Number(r.tendered || r.amount) || 0 : 0), 0),
-  );
-  const cashApplied = $derived(
-    rows.reduce((n, r) => n + (r.method === 'cash' ? Number(r.amount) || 0 : 0), 0),
-  );
-  const change = $derived(Math.max(0, tenderedTotal - cashApplied));
+  const online = $derived(pulse.status?.online ?? true);
+  const needsCustomer = $derived(tender.lines.some((l) => l.method === 'credit') && !cart.customerID);
 
-  const needsCustomer = $derived(rows.some((r) => r.method === 'credit'));
-
-  // Fill remaining balance into empty amounts.
-  $effect(() => {
-    const fill = remaining > 0 ? remaining : 0;
-    for (const r of rows) if (!r.amount) r.amount = fill ? fill.toFixed(2) : '';
+  onMount(async () => {
+    await paymethods.load();
+    active = paymethods.pick(active);
+    // A payment picked from the M-Pesa feed list is applied straight away.
+    const ref = cart.mpesaRef;
+    const t = ref ? mpesafeed.items.find((x) => x.trans_id === ref) : undefined;
+    if (t?.trans_id) {
+      tender.take('mpesa', toCents(t.amount), t.trans_id, t.payer_name || t.phone);
+      active = 'mpesa';
+    }
+    cart.mpesaRef = '';
   });
 
-  function addSplit() {
-    const next = METHODS.find((m) => !rows.some((r) => r.method === m.key));
-    rows = [...rows, { method: next?.key ?? 'cash', amount: '', tendered: '', reference: '' }];
-  }
-
-  function dropRow(i: number) {
-    rows = rows.filter((_, x) => x !== i);
-  }
-
-  const CASH = { key: 'cash', label: 'Cash', ref: false, tendered: true };
-  function spec(m: string) {
-    return METHODS.find((x) => x.key === m) ?? CASH;
-  }
-
-  function refPlaceholder(m: string): string {
-    if (m === 'mpesa') return 'M-Pesa code (e.g. QKR7ABC123)';
-    if (m === 'card') return 'Card slip / approval ref';
-    return 'Transfer reference';
-  }
-
-  const valid = $derived(
-    rows.length > 0 &&
-      Math.abs(paidNum - totalNum) < 0.005 &&
-      rows.every((r) => Number(r.amount) > 0 && (!spec(r.method).ref || r.reference.trim())) &&
-      (!needsCustomer || !!cart.customerID),
-  );
-
   async function complete() {
-    if (!bridge || busy || !valid) return;
+    if (!bridge || busy || !tender.settled || needsCustomer) return;
     busy = true;
     error = '';
-    const payments = rows.map((r) => ({
-      method: r.method,
-      amount: r.amount,
-      ...(r.method === 'cash' && r.tendered ? { tendered: r.tendered } : {}),
-      ...(r.reference.trim() ? { reference: r.reference.trim() } : {}),
-    }));
     try {
-      const res = await bridge.Pay(
-        JSON.stringify(payments),
+      const result = await bridge.Pay(
+        JSON.stringify(tender.payload()),
         cart.payload(),
         '0',
         cart.customerID,
         cart.grant,
         '',
       );
-      done = res;
-      // Claimed transactions leave the till's unallocated feed.
-      for (const r of rows) {
-        if (r.method === 'mpesa' && r.reference.trim()) {
-          mpesafeed.dropByTrans(r.reference.trim());
-        }
-      }
+      for (const l of tender.lines)
+        if (l.method === 'mpesa' && l.reference) mpesafeed.dropByTrans(l.reference);
+      // The drawer closes; the change and receipt show in the empty cart.
+      onpaid(result);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Payment failed';
     } finally {
@@ -133,189 +80,181 @@
     }
   }
 
-  function finish() {
-    if (done) onpaid(done);
+  function close() {
+    if (!busy && (tender.lines.length === 0 || confirm('Discard the payments taken so far?'))) onclose();
   }
+
+  // Capture phase so the checkout's own shortcuts (Esc = cancel sale) never
+  // fire underneath this screen.
+  function onkey(e: KeyboardEvent) {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    const fkeys: Record<string, number> = { F1: 0, F2: 1, F3: 2, F4: 3 };
+    if (e.key in fkeys) {
+      const m = methods[fkeys[e.key]!];
+      if (m) active = m;
+    } else if (e.key === 'Escape') {
+      close();
+    } else if (e.key === 'Enter') {
+      if (tender.settled) void complete();
+      else if (active === 'cash') cash?.submit();
+      else return;
+    } else if (!typing && active === 'cash' && /^([0-9.]|Backspace)$/.test(e.key)) {
+      cash?.type(e.key);
+    } else {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  onMount(() => {
+    window.addEventListener('keydown', onkey, true);
+    return () => window.removeEventListener('keydown', onkey, true);
+  });
 </script>
 
-<div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && !done && onclose()}>
-  <div class="modal">
-    {#if done}
-      <PaidDone {currency} result={done} ondone={finish} />
-    {:else}
-      <h3>Tender — {currency} {formatMoney(cart.totals.total)}</h3>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="backdrop" onclick={(e) => e.target === e.currentTarget && close()}>
+  <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="pay-title">
+    <DrawerHeader title="Complete payment" onclose={close} />
 
-      {#each rows as r, i (i)}
-        <div class="payrow">
-          <select bind:value={r.method}>
-            {#each METHODS as m (m.key)}<option value={m.key}>{m.label}</option>{/each}
-          </select>
-          <input class="amt" bind:value={r.amount} inputmode="decimal" placeholder="Amount" />
-          {#if rows.length > 1}
-            <button class="x" onclick={() => dropRow(i)} aria-label="Remove">
-              <Icon name="x" size={13} />
-            </button>
-          {/if}
-          {#if spec(r.method).tendered}
-            <input
-              class="wide"
-              bind:value={r.tendered}
-              inputmode="decimal"
-              placeholder="Tendered (blank = exact)"
-            />
-          {/if}
-          {#if spec(r.method).ref}
-            <input class="wide" bind:value={r.reference} placeholder="{refPlaceholder(r.method)} *" />
-          {/if}
-          {#if r.method === 'mpesa'}
-            <MpesaPay
-              amount={r.amount || remaining.toFixed(2)}
-              onconfirmed={(id) => (r.reference = id)}
-              onfailed={() => {}}
-            />
+    <div class="body">
+      <Summary {tender} {currency} />
+      {#if tender.remaining === 0}
+        <div class="paid">
+          <strong>Fully paid</strong>
+          <p>Press <kbd>Enter</kbd> to complete. Remove a payment above to change it.</p>
+        </div>
+      {:else}
+        <MethodTabs {methods} bind:active />
+        <div class="panel">
+          {#if active === 'cash'}
+            <CashPanel bind:this={cash} {tender} {currency} />
+          {:else if active === 'mpesa'}
+            <MpesaPanel {tender} {currency} {online} />
+          {:else}
+            {#key active}<OtherPanel {tender} {currency} method={active} />{/key}
           {/if}
         </div>
-      {/each}
-
-      <div class="sumrow">
-        <span>Paid <b>{formatMoney(paidNum.toFixed(2))}</b></span>
-        {#if remaining > 0.004}
-          <span class="rem">Remaining <b>{formatMoney(remaining.toFixed(2))}</b></span>
-        {:else if change > 0}
-          <span class="chg">Change <b>{formatMoney(change.toFixed(2))}</b></span>
-        {:else}
-          <span class="ok">Exact</span>
-        {/if}
-        {#if rows.length < METHODS.length}
-          <button class="split" onclick={addSplit}>+ Split</button>
-        {/if}
-      </div>
-
-      <CustomerPick />
-      {#if needsCustomer && !cart.customerID}
-        <p class="err">Pick a customer — credit sales need an account.</p>
       {/if}
+      <CustomerLine required={needsCustomer} />
+    </div>
 
+    <footer>
+      {#if needsCustomer}<p class="err">Pick the customer to charge their account.</p>{/if}
       {#if error}<p class="err">{error}</p>{/if}
-      <div class="row2">
-        <button class="ghost" onclick={onclose}>Back</button>
-        <button class="go" onclick={complete} disabled={busy || !valid}>
-          {busy ? '…' : `Complete sale — ${currency} ${formatMoney(cart.totals.total)}`}
-        </button>
-      </div>
-    {/if}
+      <button class="complete" disabled={!tender.settled || busy || needsCustomer} onclick={complete}>
+        {#if busy}
+          Completing…
+        {:else if tender.settled}
+          <Icon name="check" size={22} />
+          Complete sale{tender.change > 0 ? ` · change ${formatMoney(fromCents(tender.change))}` : ''}
+          <kbd>Enter</kbd>
+        {:else}
+          {currency} {formatMoney(fromCents(tender.remaining))} still to pay
+        {/if}
+      </button>
+      <button class="back" onclick={close}>
+        <Icon name="arrow-left" size={18} /> Back to products <kbd>Esc</kbd>
+      </button>
+    </footer>
   </div>
 </div>
 
 <style>
-  .overlay {
+  .backdrop {
     position: fixed;
     inset: 0;
-    background: rgb(6 12 24 / 0.55);
+    z-index: 50;
+    display: flex;
+    justify-content: flex-end;
+    background: rgb(15 23 42 / 0.45);
+  }
+  .drawer {
+    width: min(660px, 100vw);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg);
+    box-shadow: -18px 0 48px rgb(0 0 0 / 0.3);
+    animation: slide 0.16s ease-out;
+  }
+  .body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 18px;
+    overflow-y: auto;
+  }
+  .panel {
+    padding: 14px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  footer {
+    display: grid;
+    gap: 8px;
+    padding: 12px 18px 16px;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .err {
+    margin: 0;
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+  .complete,
+  .back {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 50;
-  }
-  .modal {
-    width: min(480px, 94vw);
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
-    box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
-  }
-  h3 {
-    margin: 0 0 var(--space-3);
-    font-size: var(--text-lg);
-  }
-  .payrow {
-    display: grid;
-    grid-template-columns: 110px 1fr auto;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
-  }
-  .payrow .wide {
-    grid-column: 1 / -1;
-  }
-  select,
-  input {
-    padding: 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    gap: 8px;
     font: inherit;
-    font-size: var(--text-base);
-    background: var(--color-surface);
-  }
-  .amt {
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-  .x {
-    border: 0;
-    background: none;
-    color: var(--color-danger);
+    font-weight: 800;
     cursor: pointer;
-    font-size: 14px;
   }
-  .sumrow {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    margin: var(--space-3) 0;
-    font-size: var(--text-sm);
+  .complete {
+    min-height: 62px;
+    font-size: 1.3rem;
+    color: #fff;
+    background: var(--color-success);
+    border: 0;
+    border-radius: var(--radius-lg);
   }
-  .rem {
-    color: var(--color-warning);
+  .complete:disabled {
+    color: var(--color-text-muted);
+    background: var(--color-surface-muted);
+    cursor: default;
   }
-  .chg {
+  .back {
+    height: 50px;
     color: var(--color-primary);
-    font-weight: 600;
+    background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+    border-radius: var(--radius-md);
   }
-  .ok {
+  kbd {
+    font-size: 0.72rem;
+    font-weight: 600;
+    opacity: 0.65;
+  }
+  .paid {
+    padding: 24px;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-success) 10%, var(--color-surface));
+  }
+  .paid strong {
+    font-size: 1.7rem;
     color: var(--color-success);
   }
-  .split {
-    margin-left: auto;
-    border: 1px dashed var(--color-border);
-    background: none;
-    border-radius: var(--radius-md);
-    padding: 6px 12px;
-    font-size: var(--text-sm);
-    cursor: pointer;
-    color: var(--color-primary);
-  }
-  .err {
-    color: var(--color-danger);
-    font-size: var(--text-sm);
-    margin: var(--space-2) 0;
-  }
-  .row2 {
-    display: flex;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
-  }
-  .ghost {
-    flex: 1;
-    padding: 12px;
-    border: 1px solid var(--color-border);
-    background: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font: inherit;
-  }
-  .go {
-    flex: 2;
-    padding: 12px;
-    border: 0;
-    background: var(--color-success);
-    color: #fff;
-    font-weight: 700;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-size: var(--text-base);
-  }
-  .go:disabled {
-    opacity: 0.5;
-    cursor: default;
+  @keyframes slide {
+    from {
+      transform: translateX(40px);
+      opacity: 0;
+    }
   }
 </style>

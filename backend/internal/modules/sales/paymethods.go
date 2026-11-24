@@ -23,8 +23,13 @@ var methods = map[string]MethodSpec{
 	"credit": {Label: "Customer credit", RequiresCustomer: true},
 	// mpesa: reference is the M-Pesa transaction code (e.g. QKR7ABC123); a
 	// confirmed feed transaction with that code is consumed at completion.
-	"mpesa": {Label: "M-Pesa", RequiresReference: true},
+	// Tendered is what the customer actually sent: customers often round up
+	// (1,100 for a 1,090 bill), and the excess is handed back as cash change.
+	"mpesa": {Label: "M-Pesa", RequiresReference: true, Tendered: true},
 }
+
+// DefaultMethods are offered when a tenant has not chosen its own list.
+var DefaultMethods = []string{"cash", "mpesa", "card"}
 
 // Methods returns the registry for API clients.
 func Methods() map[string]MethodSpec {
@@ -43,6 +48,7 @@ var (
 	ErrUnderpaid       = httpx.NewError(422, "underpaid", "Payments do not cover the sale total.")
 	ErrOverpaid        = httpx.NewError(422, "overpaid", "Payments exceed the sale total.")
 	ErrUnknownMethod   = httpx.NewError(422, "unknown_method", "Unknown payment method.")
+	ErrMethodDisabled  = httpx.NewError(422, "method_disabled", "This payment method is switched off for the business.")
 	ErrNeedReference   = httpx.NewError(422, "reference_required", "This payment method needs a reference.")
 	ErrNeedCustomer    = httpx.NewError(422, "customer_required", "Credit sales need a customer account.")
 	ErrUnderTendered   = httpx.NewError(422, "under_tendered", "Tendered amount is less than the payment.")

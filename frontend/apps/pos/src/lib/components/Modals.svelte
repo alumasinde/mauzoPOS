@@ -1,10 +1,8 @@
 <script lang="ts">
-  // Checkout modals: price check, quantity, discount, supervisor PIN, the
-  // "more" menu, and the unknown-barcode prompt. Pay and held-sale modals are
-  // their own components; open() routes to them.
-  import { desktop, type PayResult, type PriceCheckResult } from '../desktop';
+  // Checkout modals (price check, quantity, discount, supervisor PIN, more,
+  // unknown barcode); open() also routes to the pay and held components.
+  import { desktop, type PayResult } from '../desktop';
   import { cart } from '../cart.svelte';
-  import { formatMoney } from '../money';
   import PinPad from './PinPad.svelte';
   import PayModal from './PayModal.svelte';
   import HeldModal from './HeldModal.svelte';
@@ -12,6 +10,9 @@
   import MoreModal from './MoreModal.svelte';
   import LookupModal from './LookupModal.svelte';
   import MpesaFeedModal from './MpesaFeedModal.svelte';
+  import ShiftFlow from './ShiftFlow.svelte';
+  import UnknownBarcode from './UnknownBarcode.svelte';
+  import PriceCheck from './PriceCheck.svelte';
 
   type Modal =
     | 'none'
@@ -24,7 +25,11 @@
     | 'more'
     | 'unknown'
     | 'lookup'
-    | 'mpesa';
+    | 'mpesa'
+    | 'shiftopen'
+    | 'shiftcash'
+    | 'shiftclose'
+    | 'shiftreport';
 
   let {
     currency = 'KSh',
@@ -52,8 +57,6 @@
 
   // price check
   let pcCode = $state('');
-  let pcResult = $state<PriceCheckResult | null>(null);
-  let pcBusy = $state(false);
 
   // quantity / discount
   let qtyValue = $state('');
@@ -69,17 +72,25 @@
   export function open(m: Modal, code = '') {
     if (m === 'pay') payMethod = '';
     which = m;
-    if (m === 'pricecheck') {
-      pcCode = code;
-      pcResult = null;
-    }
+    if (m === 'pricecheck') pcCode = code;
     if (m === 'quantity') qtyValue = String(cart.rows[cart.selected]?.qty ?? 1);
     if (m === 'discount') discValue = '';
     if (m === 'unknown') unknownCode = code;
   }
 
+  /** A modal is showing — checkout shortcuts (Esc = cancel sale) must not fire. */
+  export function isOpen(): boolean {
+    return which !== 'none';
+  }
+
   export function close() {
     which = 'none';
+  }
+
+  // A completed sale closes the drawer; the result shows in the empty cart.
+  function paid(r: PayResult) {
+    close();
+    onpaid(r);
   }
 
   export function withSupervisor(fn: () => void) {
@@ -115,17 +126,10 @@
     await cart.setDiscount(cart.selected, discValue || '0');
     close();
   }
-
-  async function runPriceCheck() {
-    if (!bridge || !pcCode.trim()) return;
-    pcBusy = true;
-    pcResult = await bridge.PriceCheck(pcCode.trim()).catch(() => null);
-    pcBusy = false;
-  }
 </script>
 
 {#if which === 'pay'}
-  <PayModal {currency} method={payMethod || method} onclose={close} {onpaid} />
+  <PayModal {currency} method={payMethod || method} onclose={close} onpaid={paid} />
 {:else if which === 'mpesa'}
   <div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
     <MpesaFeedModal
@@ -145,32 +149,7 @@
 {:else if which !== 'none'}
   <div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
     {#if which === 'pricecheck'}
-      <div class="modal">
-        <h3>Price check</h3>
-        <div class="pcRow">
-          <input
-            bind:value={pcCode}
-            placeholder="Barcode or SKU"
-            onkeydown={(e) => e.key === 'Enter' && runPriceCheck()}
-          />
-          <button class="go" onclick={runPriceCheck} disabled={pcBusy}>{pcBusy ? '…' : 'Check'}</button>
-        </div>
-        {#if pcResult}
-          {#if pcResult.unknown}
-            <p class="muted">No product matches <code>{pcResult.code}</code>.</p>
-          {:else}
-            <div class="pcRes">
-              <b>{pcResult.name}</b>
-              <span class="sku">{pcResult.sku}</span>
-              <span class="pcPrice">
-                {currency}
-                {formatMoney(pcResult.price ?? '0')}{pcResult.sell_by === 'weight' ? ' /kg' : ''}
-              </span>
-            </div>
-          {/if}
-        {/if}
-        <button class="ghost" onclick={close}>Close</button>
-      </div>
+      <PriceCheck code={pcCode} {currency} onclose={close} />
     {:else if which === 'quantity'}
       <ValuePrompt
         title="Quantity — {cart.rows[cart.selected]?.name ?? ''}"
@@ -202,31 +181,16 @@
       <MoreModal
         onclose={close}
         {onlock}
-        {onsync}
         {onswitch}
         onheld={() => open('held')}
         onlookup={() => open('lookup')}
         onmpesa={() => open('mpesa')}
+        onshift={(m) => open(m)}
       />
+    {:else if which === 'shiftopen' || which === 'shiftcash' || which === 'shiftclose' || which === 'shiftreport'}
+      <ShiftFlow mode={which} {currency} onclose={close} />
     {:else if which === 'unknown'}
-      <div class="modal">
-        <h3>Unknown barcode</h3>
-        <p class="muted">
-          <code>{unknownCode}</code> isn't in the catalog. Check the label or sync the catalog.
-        </p>
-        <div class="row2">
-          <button class="ghost" onclick={close}>Dismiss</button>
-          <button
-            class="go"
-            onclick={() => {
-              onsync();
-              close();
-            }}
-          >
-            Sync catalog
-          </button>
-        </div>
-      </div>
+      <UnknownBarcode code={unknownCode} {onsync} onclose={close} />
     {/if}
   </div>
 {/if}
@@ -246,72 +210,5 @@
     border-radius: var(--radius-lg);
     padding: var(--space-5);
     box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
-  }
-  h3 {
-    margin: 0 0 var(--space-3);
-  }
-  .muted {
-    color: var(--color-text-muted);
-  }
-  input {
-    width: 100%;
-    padding: var(--space-3);
-    font: inherit;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-sizing: border-box;
-  }
-  .pcRow {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
-  }
-  .pcRes {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin: var(--space-3) 0;
-  }
-  .pcRes .sku {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-  }
-  .pcPrice {
-    font-size: var(--text-2xl);
-    font-weight: 700;
-    color: var(--color-primary);
-  }
-  .row2 {
-    display: flex;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
-  }
-  .row2 .go,
-  .row2 .ghost {
-    flex: 1;
-  }
-  .go {
-    padding: var(--space-3) var(--space-4);
-    font-weight: 700;
-    color: #fff;
-    background: var(--color-primary);
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-  .go:disabled {
-    opacity: 0.5;
-  }
-  .ghost {
-    margin-top: var(--space-3);
-    padding: var(--space-2) var(--space-4);
-    font: inherit;
-    background: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-  .row2 .ghost {
-    margin-top: 0;
   }
 </style>

@@ -1,10 +1,17 @@
 <script lang="ts">
   import { cart } from '../cart.svelte';
   import { formatMoney } from '../money';
+  import { pulse } from '../pulse.svelte';
+  import PaidDone from './PaidDone.svelte';
 
   let { currency = 'KSh' }: { currency?: string } = $props();
 
   const money = (s: string | number) => formatMoney(String(s), currency);
+
+  // The next item scanned starts a new sale: the last sale's card goes.
+  $effect(() => {
+    if (cart.count > 0 && pulse.lastSale) pulse.lastSale = null;
+  });
 </script>
 
 <aside class="cart">
@@ -54,7 +61,13 @@
         <span class="num">{money(row.priced?.total ?? '—')}</span>
       </div>
     {:else}
-      <p class="empty">Scan a barcode or tap a product to start a sale.</p>
+      {#if pulse.lastSale}
+        {#key pulse.lastSale}
+          <PaidDone {currency} result={pulse.lastSale} ondone={() => (pulse.lastSale = null)} />
+        {/key}
+      {:else}
+        <p class="empty">Scan a barcode or tap a product to start a sale.</p>
+      {/if}
     {/each}
   </div>
   <div class="totals">

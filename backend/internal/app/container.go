@@ -32,6 +32,7 @@ import (
 	"mauzo/internal/modules/roles"
 	"mauzo/internal/modules/sales"
 	"mauzo/internal/modules/settings"
+	"mauzo/internal/modules/shifts"
 	"mauzo/internal/modules/subscriptions"
 	"mauzo/internal/modules/system"
 	"mauzo/internal/modules/tenants"
@@ -82,6 +83,7 @@ type Container struct {
 	Sales         *sales.Handler
 	Receipts      *receipts.Handler
 	MPesa         *mpesa.Handler
+	Shifts        *shifts.Handler
 }
 
 // NewContainer builds the logger, database pool and module services.
@@ -98,9 +100,7 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	mailer := mail.New(cfg.Mail, log)
 	params := cfg.Auth.Argon2Params()
 
-	tenantRepo := tenants.NewRepo(conn)
-	platformUserRepo := users.NewPlatformUserRepo(conn)
-	userRepo := users.NewUserRepo(conn)
+	tenantRepo, platformUserRepo, userRepo := tenants.NewRepo(conn), users.NewPlatformUserRepo(conn), users.NewUserRepo(conn)
 
 	// Plans gate modules; module enablement and roles feed per-request access.
 	planSvc := subscriptions.NewService(subscriptions.NewRepo(conn), cfg.Onboarding.TrialDays)
@@ -121,7 +121,7 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	pricingSvc, promoSvc, invSvc := stockPricingStack(conn, catalogSvc, taxSvc, branchSvc)
 	customerSvc := customers.NewService(customers.NewRepo(conn))
 	salesSvc := sales.NewService(conn, sales.NewRepo(conn), catalogSvc, pricingSvc, promoSvc, invSvc, customerSvc)
-	posSvc, mpesaSvc, receiptSvc, err := posPaymentsStack(conn, cfg, auditW, salesSvc)
+	posSvc, mpesaSvc, receiptSvc, shiftSvc, err := posPaymentsStack(conn, cfg, auditW, salesSvc)
 	if err != nil {
 		return nil, err
 	}
@@ -167,6 +167,7 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Sales:     sales.NewHandler(salesSvc, branchSvc),
 		Receipts:  receipts.NewHandler(receiptSvc, salesSvc),
 		MPesa:     mpesa.NewHandler(mpesaSvc),
+		Shifts:    shifts.NewHandler(shiftSvc),
 	}, nil
 }
 
@@ -175,20 +176,23 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 // reads sales for allocation verification, the till initiates pushes and
 // streams the feed.
 func posPaymentsStack(conn *sqlx.DB, cfg config.Config, auditW *audit.Writer,
-	salesSvc *sales.Service) (*pos.Service, *mpesa.Service, *receipts.Service, error) {
+	salesSvc *sales.Service) (*pos.Service, *mpesa.Service, *receipts.Service, *shifts.Service, error) {
 	posSvc := pos.NewService(conn, pos.NewRepo(conn))
 	posSvc.BindSales(salesSvc)
 	mpesaSvc, err := mpesa.NewService(conn, mpesa.NewRepo(conn),
 		mpesaKey(cfg), cfg.PublicBaseURL, auditW)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	salesSvc.BindMpesa(mpesaSvc)
 	mpesaSvc.BindSales(salesSvc)
 	posSvc.BindMpesa(mpesaSvc)
 	receiptSvc := receipts.NewService(conn, receipts.NewRepo(conn))
 	posSvc.BindReceipts(receiptSvc)
-	return posSvc, mpesaSvc, receiptSvc, nil
+	shiftSvc := shifts.NewService(conn, shifts.NewRepo(conn))
+	salesSvc.BindShifts(shiftSvc)
+	posSvc.BindShifts(shiftSvc)
+	return posSvc, mpesaSvc, receiptSvc, shiftSvc, nil
 }
 
 // mpesaKey resolves the credential-encryption key. Production requires the env
@@ -213,7 +217,7 @@ func tenantTooling(
 	tenantSvc.AddProvisioner(roleSvc)
 	settingsStore := coresettings.NewStore(conn)
 	btSvc := businesstypes.NewService(businesstypes.NewRepo(conn), settingsStore, tenantSvc, registrySvc)
-	branchSvc := branches.NewService(branches.NewRepo(conn))
+	branchSvc := branches.NewService(conn, branches.NewRepo(conn))
 	return tenantSvc, settingsStore, btSvc, branchSvc,
 		terminals.NewService(terminals.NewRepo(conn), branchSvc)
 }

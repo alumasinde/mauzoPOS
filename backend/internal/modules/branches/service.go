@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
+
+	"mauzo/internal/core/db"
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/security"
 )
@@ -16,11 +19,14 @@ var (
 
 // Service owns branch business rules.
 type Service struct {
+	conn *sqlx.DB
 	repo *Repo
 }
 
 // NewService builds a Service.
-func NewService(repo *Repo) *Service { return &Service{repo: repo} }
+func NewService(conn *sqlx.DB, repo *Repo) *Service {
+	return &Service{conn: conn, repo: repo}
+}
 
 // CreateRequest is POST /t/branches and the onboarding branch step.
 type CreateRequest struct {
@@ -76,6 +82,64 @@ func (s *Service) Create(ctx context.Context, tenantID uint64, req CreateRequest
 		return Branch{}, err
 	}
 	return b, nil
+}
+
+// UpdateRequest is PATCH /t/branches/{id}.
+type UpdateRequest struct {
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	Phone    string `json:"phone"`
+	Location string `json:"location"`
+	IsMain   *bool  `json:"is_main"`
+	Status   string `json:"status"` // "" keeps current
+}
+
+// Update edits a branch. Code stays unique per tenant; setting is_main clears
+// it on the others. The main branch cannot be closed.
+func (s *Service) Update(ctx context.Context, tenantID uint64, publicID string,
+	req UpdateRequest) (Branch, error) {
+	b, err := s.repo.ByPublicID(ctx, tenantID, publicID)
+	if err != nil {
+		return Branch{}, ErrBranchNotFound
+	}
+	if c := strings.ToUpper(strings.TrimSpace(req.Code)); c != "" && c != b.Code {
+		b.Code = c
+	}
+	if n := strings.TrimSpace(req.Name); n != "" {
+		b.Name = n
+	}
+	b.Phone = nilIfEmpty(req.Phone)
+	b.Location = nilIfEmpty(req.Location)
+	if req.Status != "" {
+		if req.Status != StatusActive && req.Status != StatusClosed {
+			return Branch{}, httpx.ErrValidation.WithDetails(
+				map[string]any{"status": "active | closed"})
+		}
+		b.Status = req.Status
+	}
+	if req.IsMain != nil {
+		b.IsMain = *req.IsMain
+	}
+	if b.Status == StatusClosed && b.IsMain {
+		return Branch{}, httpx.NewError(422, "main_closed",
+			"The main branch cannot be closed — make another branch main first.")
+	}
+	err = db.WithTx(ctx, s.conn, func(tx *sqlx.Tx) error {
+		if err := s.repo.Update(ctx, tx, b); err != nil {
+			if strings.Contains(err.Error(), "uq_branches_tenant_code") {
+				return ErrCodeTaken
+			}
+			return err
+		}
+		if b.IsMain {
+			return s.repo.ClearMain(ctx, tx, tenantID, b.ID)
+		}
+		return nil
+	})
+	if err != nil {
+		return Branch{}, err
+	}
+	return s.repo.ByPublicID(ctx, tenantID, publicID)
 }
 
 // ToResponse maps a Branch to its API view.

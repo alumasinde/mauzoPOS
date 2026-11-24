@@ -13,10 +13,13 @@ import (
 // transaction its payment reference cites, inside the same DB transaction.
 type MpesaConsumer interface {
 	// ConsumeInTx marks a confirmed M-Pesa transaction as funding this sale.
-	// Fails (rolling the whole sale back) when the transaction is missing,
-	// unconfirmed, already allocated, or a different amount.
-	ConsumeInTx(ctx context.Context, tx *sqlx.Tx, tenantID uint64,
-		transID string, amount decimal.Decimal, saleID uint64) error
+	// received is what the customer sent (≥ applied; the excess was given
+	// back as change). It fails — rolling the sale back — when the
+	// transaction is missing, unconfirmed, already allocated or a different
+	// amount; with lenient set (offline uploads) those cases return
+	// verified=false instead so the sale is kept and reconciled later.
+	ConsumeInTx(ctx context.Context, tx *sqlx.Tx, tenantID uint64, transID string,
+		received decimal.Decimal, saleID uint64, lenient bool) (verified bool, err error)
 	// ReleaseInTx frees transactions allocated to a sale (void path).
 	ReleaseInTx(ctx context.Context, tx *sqlx.Tx, saleID uint64) error
 }
@@ -27,18 +30,28 @@ type MpesaConsumer interface {
 func (s *Service) BindMpesa(c MpesaConsumer) { s.mpesa = c }
 
 // consumeMpesa claims the transactions cited by mpesa payment lines, inside
-// the caller's transaction.
+// the caller's transaction, before the lines are written so an unmatched
+// offline code can be stored as unverified.
 func (s *Service) consumeMpesa(ctx context.Context, tx *sqlx.Tx, tenantID uint64,
-	payments []SalePayment, saleID uint64) error {
+	payments []SalePayment, saleID uint64, offline bool) error {
 	if s.mpesa == nil {
 		return nil
 	}
-	for _, p := range payments {
+	for i := range payments {
+		p := &payments[i]
 		if p.Method != "mpesa" || p.Reference == "" || !p.Amount.IsPositive() {
 			continue
 		}
-		if err := s.mpesa.ConsumeInTx(ctx, tx, tenantID, p.Reference, p.Amount, saleID); err != nil {
+		received := p.Amount
+		if p.Tendered != nil {
+			received = *p.Tendered
+		}
+		ok, err := s.mpesa.ConsumeInTx(ctx, tx, tenantID, p.Reference, received, saleID, offline)
+		if err != nil {
 			return err
+		}
+		if !ok {
+			p.Status = PayUnverified
 		}
 	}
 	return nil
@@ -53,7 +66,8 @@ func (s *Service) releaseMpesa(ctx context.Context, tx *sqlx.Tx, saleID uint64) 
 }
 
 // MpesaCandidate is a sale carrying mpesa tender — the reconciliation screen
-// matches unallocated collections against these.
+// matches unallocated collections against these. MpesaAmount is what the
+// customer sent (tendered), which is what the transaction carries.
 type MpesaCandidate struct {
 	SaleID      uint64          `db:"sale_id" json:"sale_id"`
 	PublicID    string          `db:"public_id" json:"public_id"`
@@ -66,6 +80,8 @@ type MpesaCandidate struct {
 	Reference   string          `db:"reference" json:"reference"`
 	SoldAt      time.Time       `db:"sold_at" json:"sold_at"`
 	Allocated   bool            `db:"allocated" json:"allocated"`
+	// Unverified: an offline-recorded M-Pesa code the server could not match.
+	Unverified bool `db:"unverified" json:"unverified"`
 }
 
 // MpesaPayments lists recent completed sales that took mpesa tender, flagged

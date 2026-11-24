@@ -71,11 +71,13 @@
           mpesaApi.list({ ...f, status: 'reversal_pending' }, page),
           mpesaApi.list({ ...f, status: 'reversed' }, page),
         ]);
-        rows = [...pend.items, ...rev.items].sort((a, b) => b.created_at.localeCompare(a.created_at));
+        rows = [...(pend.items ?? []), ...(rev.items ?? [])].sort((a, b) =>
+          b.created_at.localeCompare(a.created_at),
+        );
         total = pend.total + rev.total;
       } else {
         const res = await mpesaApi.list(f, page);
-        rows = res.items;
+        rows = res.items ?? [];
         total = res.total;
       }
       const [s, sug] = await Promise.all([
@@ -83,7 +85,7 @@
         mpesaApi.suggestions().catch(() => ({ items: [] })),
       ]);
       summary = s;
-      suggestions = sug.items;
+      suggestions = sug.items ?? [];
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Could not load M-Pesa transactions');
     } finally {
@@ -114,6 +116,7 @@
   };
 
   const strongSugg = $derived(suggestions.filter((s) => s.strength === 'strong'));
+  const offlineSugg = $derived(suggestions.filter((s) => s.strength === 'unverified').length);
 
   onMount(load);
 </script>
@@ -146,6 +149,14 @@
   <StatCard label="Failed (7 days)" value={String(summary?.failed_7d ?? 0)} icon="alert" tone="red" />
 </div>
 
+{#if offlineSugg > 0}
+  <div class="sugg">
+    <Icon name="alert" size={16} /><span>
+      <b>{offlineSugg}</b> offline sale(s) cite an M-Pesa code that has not matched yet — allocate the right payment
+      below.
+    </span>
+  </div>
+{/if}
 {#if strongSugg.length > 0}
   <div class="sugg">
     <Icon name="info" size={16} />

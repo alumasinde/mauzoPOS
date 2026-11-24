@@ -105,6 +105,19 @@ func acquireSuiteLock(ctx context.Context, conn *sqlx.DB) error {
 	return nil
 }
 
+// EnsurePermissions inserts rows into the permissions table so tests can grant
+// them in role_permissions without depending on which package last synced the
+// registry. Safe to call repeatedly (INSERT IGNORE).
+func EnsurePermissions(t testing.TB, conn *sqlx.DB, codes ...string) {
+	t.Helper()
+	for _, code := range codes {
+		if _, err := conn.ExecContext(context.Background(),
+			`INSERT IGNORE INTO permissions (code, scope) VALUES (?, 'tenant')`, code); err != nil {
+			t.Fatalf("ensure permission %s: %v", code, err)
+		}
+	}
+}
+
 // Truncate empties the given tables after the test.
 func Truncate(t testing.TB, conn *sqlx.DB, tables ...string) {
 	t.Helper()

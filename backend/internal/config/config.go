@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -99,9 +100,21 @@ func (a AuthConfig) Argon2Params() security.Argon2Params {
 }
 
 // DSN builds a go-sql-driver/mysql DSN for the given database name.
+//
+// Times are read as UTC (loc=UTC), so the session must also store UTC:
+// otherwise NOW() writes server-local time (EAT in Kenya) that Go reads back
+// three hours off — tills look online for hours, codes expire late. The
+// session time zone is forced here even when DB_PARAMS overrides the rest.
 func (d DBConfig) DSN(dbName string) string {
+	params := d.Params
+	if !strings.Contains(params, "time_zone=") {
+		if params != "" {
+			params += "&"
+		}
+		params += "time_zone=%27%2B00%3A00%27" // '+00:00'
+	}
 	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
-		d.User, url.QueryEscape(d.Password), d.Host, d.Port, dbName, d.Params)
+		d.User, url.QueryEscape(d.Password), d.Host, d.Port, dbName, params)
 }
 
 // IsDevelopment reports whether the app runs in the development environment.

@@ -30,6 +30,7 @@ import (
 	"mauzo/internal/modules/roles"
 	"mauzo/internal/modules/sales"
 	"mauzo/internal/modules/settings"
+	"mauzo/internal/modules/shifts"
 	"mauzo/internal/modules/subscriptions"
 	"mauzo/internal/modules/system"
 	"mauzo/internal/modules/tenants"
@@ -102,6 +103,7 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 		sales.TenantRoutes(r, c.Sales)
 		receipts.TenantRoutes(r, c.Receipts)
 		mpesa.TenantRoutes(r, c.MPesa)
+		shifts.TenantRoutes(r, c.Shifts)
 		onboarding.TenantRoutes(r, c.Onboarding)
 	})
 }

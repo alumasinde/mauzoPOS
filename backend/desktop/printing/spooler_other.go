@@ -11,3 +11,5 @@ func spoolRaw(string, string, []byte) error { return errNoSpooler }
 func probeSpooler(string) error { return errNoSpooler }
 
 func listPrinters() ([]string, error) { return []string{}, nil }
+
+func openFile(string) error { return nil }

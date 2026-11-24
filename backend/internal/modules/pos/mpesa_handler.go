@@ -70,25 +70,25 @@ func (h *Handler) STKStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // MpesaFeed handles GET /pos/mpesa/feed — a long-lived SSE stream of confirmed
-// collections for this till's tenant.
+// collections (and prompt results) for this till's branch.
 func (h *Handler) MpesaFeed(w http.ResponseWriter, r *http.Request) {
 	d, _ := DeviceFrom(r.Context())
 	if h.svc.mpesa == nil {
 		httpx.WriteError(w, r, mpesa.ErrNotConfigured)
 		return
 	}
-	h.svc.mpesa.ServeFeed(w, r, d.TenantID)
+	h.svc.mpesa.ServeFeed(w, r, d.TenantID, d.BranchID)
 }
 
-// MpesaRecent handles GET /pos/mpesa/recent — unallocated collections for feed
-// hydration after a reconnect.
+// MpesaRecent handles GET /pos/mpesa/recent — this branch's unclaimed
+// collections from the last few hours (feed hydration after a reconnect).
 func (h *Handler) MpesaRecent(w http.ResponseWriter, r *http.Request) {
 	d, _ := DeviceFrom(r.Context())
 	if h.svc.mpesa == nil {
 		httpx.WriteError(w, r, mpesa.ErrNotConfigured)
 		return
 	}
-	rows, err := h.svc.mpesa.FeedSince(r.Context(), d.TenantID)
+	rows, err := h.svc.mpesa.FeedForTill(r.Context(), d.TenantID, d.BranchID)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return

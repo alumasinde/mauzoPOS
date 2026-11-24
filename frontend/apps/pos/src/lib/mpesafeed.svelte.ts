@@ -9,6 +9,8 @@ import { formatMoney } from './money';
 const bridge = desktop();
 let items = $state<MpesaTxn[]>([]);
 let listening = false;
+// Waiting STK prompts: notified the moment their result arrives on the feed.
+let stkWatchers: ((t: MpesaTxn) => void)[] = [];
 
 export const mpesafeed = {
   get items() {
@@ -55,8 +57,20 @@ export const mpesafeed = {
     }
   },
 
+  /** Calls fn with every prompt result for this branch until unsubscribed. */
+  onStk(fn: (t: MpesaTxn) => void): () => void {
+    stkWatchers = [...stkWatchers, fn];
+    return () => {
+      stkWatchers = stkWatchers.filter((w) => w !== fn);
+    };
+  },
+
   onEvent(ev: MpesaFeedEvent) {
     if (!ev?.txn) return;
+    if (ev.kind === 'stk') {
+      for (const fn of stkWatchers) fn(ev.txn);
+      return;
+    }
     if (ev.kind === 'collection') {
       const label = ev.txn.payer_name || ev.txn.phone;
       toast.success(`M-Pesa KSh ${formatMoney(ev.txn.amount)} from ${label}`);

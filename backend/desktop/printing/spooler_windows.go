@@ -144,3 +144,26 @@ func utf16PtrToString(p *uint16) string {
 	}
 	return syscall.UTF16ToString(unsafe.Slice(p, n)) //nolint:gosec // n counted from the same buffer
 }
+
+var procShellExecute = syscall.NewLazyDLL("shell32.dll").NewProc("ShellExecuteW")
+
+// openFile asks Windows to open path with its default app (ShellExecute
+// "open"); no console window flashes, unlike starting cmd.
+func openFile(path string) error {
+	verb, err := syscall.UTF16PtrFromString("open")
+	if err != nil {
+		return err
+	}
+	file, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	const swShowNormal = 1
+	//nolint:gosec // G103: Win32 FFI, pointers valid for the call
+	r, _, _ := procShellExecute.Call(0,
+		uintptr(unsafe.Pointer(verb)), uintptr(unsafe.Pointer(file)), 0, 0, swShowNormal)
+	if r <= 32 { // ShellExecute returns > 32 on success
+		return fmt.Errorf("could not open %s (no PDF viewer?)", path)
+	}
+	return nil
+}

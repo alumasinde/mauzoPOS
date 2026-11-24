@@ -65,10 +65,30 @@ func (h *Handler) IssueCode(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.ErrForbidden)
 		return
 	}
-	code, err := h.svc.IssueCode(r.Context(), actor.TenantID, chi.URLParam(r, "id"))
+	code, err := h.svc.IssueCode(r.Context(), actor.TenantID, chi.URLParam(r, "id"), actor.CanAccessBranch)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}
-	httpx.OK(w, map[string]string{"code": code})
+	httpx.OK(w, code)
+}
+
+// Update handles PATCH /t/terminals/{id} — rename, disable, enable.
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	actor, ok := identity.ActorFrom(r.Context())
+	if !ok || actor.TenantID == 0 {
+		httpx.WriteError(w, r, httpx.ErrForbidden)
+		return
+	}
+	var req UpdateRequest
+	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	t, err := h.svc.Update(r.Context(), actor.TenantID, chi.URLParam(r, "id"), req, actor.CanAccessBranch)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.OK(w, ToResponse(t))
 }

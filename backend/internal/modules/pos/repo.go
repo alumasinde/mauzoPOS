@@ -34,10 +34,11 @@ type terminalRow struct {
 	ActivationCodeHash *string    `db:"activation_code_hash"`
 	DeviceID           *string    `db:"device_id"`
 	ActivatedAt        *time.Time `db:"activated_at"`
+	CodeExpiresAt      *time.Time `db:"activation_code_expires_at"`
 }
 
 const terminalCols = `t.id, t.tenant_id, t.branch_id, t.public_id, t.name, t.status,
-	t.activation_code_hash, t.device_id, t.activated_at,
+	t.activation_code_hash, t.device_id, t.activated_at, t.activation_code_expires_at,
 	b.name AS branch_name, tn.name AS tenant_name, tn.slug AS tenant_slug,
 	COALESCE(tn.business_type,'') AS business_type`
 
@@ -72,7 +73,8 @@ func (r *Repo) Activate(ctx context.Context, q db.Querier, terminalID uint64,
 	deviceID, deviceName, tokenHash string) error {
 	res, err := q.ExecContext(ctx,
 		`UPDATE pos_terminals SET status = 'active', device_id = ?, device_name = ?,
-			device_token_hash = ?, activation_code_hash = NULL, activated_at = NOW(3), last_seen_at = NOW(3)
+			device_token_hash = ?, activation_code_hash = NULL, activation_code_expires_at = NULL,
+			activated_at = NOW(3), last_seen_at = NOW(3)
 		 WHERE id = ? AND status <> 'disabled'`,
 		deviceID, deviceName, tokenHash, terminalID)
 	if err != nil {
