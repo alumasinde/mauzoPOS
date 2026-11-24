@@ -93,3 +93,11 @@ time=2026-11-23T23:48:46.870+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CK
 time=2026-11-23T23:49:01.756+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000087 method=GET path=/readyz status=200 bytes=59 duration=0s remote=[::1]:51778
 time=2026-11-23T23:49:16.760+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000088 method=GET path=/readyz status=200 bytes=59 duration=0s remote=[::1]:51795
 time=2026-11-23T23:49:31.759+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000089 method=GET path=/readyz status=200 bytes=59 duration=0s remote=[::1]:51811
+time=2026-11-23T23:49:46.760+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000091 method=GET path=/readyz status=200 bytes=59 duration=809.4µs remote=[::1]:51830
+time=2026-11-23T23:49:46.796+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000090 method=POST path=/api/v1/pos/heartbeat status=200 bytes=48 duration=36.1537ms remote=[::1]:51829
+time=2026-11-23T23:49:46.880+03:00 level=WARN msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000092 method=POST path=/api/v1/pos/sales status=400 bytes=120 duration=81.2252ms remote=[::1]:51829
+time=2026-11-23T23:49:46.974+03:00 level=WARN msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000093 method=POST path=/api/v1/pos/sales status=400 bytes=120 duration=93.8626ms remote=[::1]:51829
+time=2026-11-23T23:49:46.977+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000094 method=GET path=/readyz status=200 bytes=59 duration=564.5µs remote=[::1]:51829
+time=2026-11-23T23:50:01.763+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000095 method=GET path=/readyz status=200 bytes=59 duration=546.6µs remote=[::1]:51851
+time=2026-11-23T23:50:16.781+03:00 level=INFO msg=http request_id=DESKTOP-UDU2CKJ/iecECay0Nd-000096 method=GET path=/readyz status=200 bytes=59 duration=0s remote=[::1]:51862
+time=2026-11-23T23:52:44.807+03:00 level=INFO msg="shutting down"

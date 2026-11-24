@@ -25,7 +25,7 @@ column is ✅ and docs are updated).
 | 6 | POS desktop & checkout | ✅ |
 | 7 | Sales & payments | ✅ |
 | 8 | Receipt printing & designer | 🟡 (built + tested; designer and printing not yet verified by hand / on a printer) |
-| 9 | M-Pesa integrations | ⬜ |
+| 9 | M-Pesa integrations | ✅ |
 | 10 | Tax engine & eTIMS | ⬜ |
 | 11 | Purchasing & suppliers | ⬜ |
 | 12 | Branches & cashier shifts | ⬜ |
@@ -219,16 +219,16 @@ column is ✅ and docs are updated).
 
 | Feature | DB | API | UI | Tests | Status |
 |---|---|---|---|---|---|
-| Per-tenant Daraja credentials (encrypted, server-only) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| C2B URL registration (Till / Paybill) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| C2B confirmation/validation callbacks (dedupe by transaction code) | ⬜ | ⬜ | ➖ | ⬜ | ⬜ |
-| Incoming payment feed to POS (SSE) | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Manual allocation to sale (all verification rules) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Matching suggestions (never amount-only proof) | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| STK Push initiate | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| STK callback handling + status query fallback | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Reconciliation screen (unallocated, allocated, disputed) | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Refund / reversal tracking | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Per-tenant Daraja credentials (encrypted, server-only) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| C2B URL registration (Till / Paybill) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| C2B confirmation/validation callbacks (dedupe by transaction code) | ✅ | ✅ | ➖ | ✅ | ✅ |
+| Incoming payment feed to POS (SSE) | ➖ | ✅ | ✅ | ➖ | ✅ |
+| Manual allocation to sale (all verification rules) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Matching suggestions (never amount-only proof) | ➖ | ✅ | ✅ | ✅ | ✅ |
+| STK Push initiate | ✅ | ✅ | ✅ | ✅ | ✅ |
+| STK callback handling + status query fallback | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Reconciliation screen (unallocated, allocated, disputed) | ➖ | ✅ | ✅ | ✅ | ✅ |
+| Refund / reversal tracking | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ## Phase 10 — Tax engine & eTIMS
 
@@ -274,7 +274,7 @@ column is ✅ and docs are updated).
 | Back-office shell: sectioned collapsible sidebar ("Soon" for unbuilt pages), branch picker (`X-Branch-Id`), online status, user menu, navy dark theme, mobile drawer | ➖ | ✅ | ✅ | ✅ | ✅ |
 | Dashboard layout + widget registry (`GET /t/dashboard`: module × permission; period picker; KPI row + panel grid) | ➖ | ✅ | ✅ | ✅ | ✅ |
 | Dashboard widgets live: inventory alerts (low stock + expiry), terminal registration status | ➖ | ✅ | ✅ | ➖ | ✅ |
-| Dashboard widgets pending their modules: sales KPIs, sales overview, recent transactions, held sales (Phase 7); M-Pesa collections (Phase 9); cash collections + payment methods (Phase 7); live terminal online/offline (Phase 6 heartbeat) | ⬜ | ⬜ | 🟡 placeholders | ⬜ | ⬜ |
+| Dashboard widgets live: sales KPIs, sales overview, recent transactions, held sales, cash collections + payment methods (Phase 7); M-Pesa collections (Phase 9); terminal online/offline (Phase 6 heartbeat) | ➖ | ✅ | ✅ | ➖ | ✅ |
 | Notifications (top-bar bell) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | Sales reports (by day, product, category, cashier, branch, payment) | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
 | Tax / VAT report | ➖ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -352,3 +352,4 @@ column is ✅ and docs are updated).
 | 2026-11-23 | Dashboard shell. Backend: nav entries gained `Section` (`core/modules/sections.go`: Sales, Inventory, Pricing, Purchasing, Payments, Reports, Team & access, Configuration) and the full sidebar from the design is declared up front, including unbuilt pages; modules declare dashboard `Widgets`; `GET /t/dashboard` returns the user's widgets (module enabled × permission); `GET /t/branches/accessible` for the branch picker; `/me` returns `role_name`. Permission files for the pending modules (sales, purchasing — adds `.view` perms, payments, mpesa, reports, receipts) and `registerall` now also links inventory and pricing (they were missing, so `migrate seed` would have synced a partial registry). Web: sidebar + top bar split into `lib/shell`, API client sends the picked branch as `X-Branch-Id`, inventory pages take `?tab=` from the URL and start on the picked branch; UI kit adds `Icon`, `Sparkline`, `AreaChart`, `DonutChart` and navy dark-theme tokens. `AreaChart`/`DonutChart` are unused until the sales/payments widgets plug in. |
 | 2026-11-23 | Phase 8: `pkg/receiptfmt` (template schema v1 + validation, layout engine, banners the template cannot remove, VAT breakdown, ESC/POS encoder with logo raster / native QR / Code 128 / drawer kick / cut, Floyd–Steinberg logo dithering, 3 builtins, print kit). Migration 00015: receipt_templates (+ immutable versions), receipt_assignments, receipt_logos, issued_receipts. `modules/receipts`: designer API (`/t/receipts/*`), snapshot on sale completion, audited reprints (`receipt.reprinted`), A4 invoice data, kit in the POS sync bundle. POS: `POST /pos/sales` returns the receipt, `POST /pos/sales/{ref}/reprint`. Desktop: `desktop/printing` (Windows spooler RAW + TCP 9100 + file), auto-print, print-once, offline provisional receipt, printer settings, test print, open drawer. Web: receipt designer (layouts, branches, logo & details), sale receipt viewer with copy history, A4 invoice page. New settings: receipt.mpesa_till/paybill/account, receipt.auto_print, receipt.copies, receipt.open_drawer. Business types now name their default receipt layout. ADR 0002. **Fixed (pre-existing):** owners (locked role, no stored permission rows) were refused at the till — sales/POS permission lookups now treat locked roles as all-permission; migration 00014's down section was truncated (`DROP TABLE sale_re`) so it could not roll back. |
 | 2026-11-24 | Design-system overhaul (reference screens): `@mauzo/ui` gains `PageHeader` (icon tile + title + subtitle + actions), `StatCard` (tinted tile KPI, delta chip, sparkline) and `Select` (pill filter); `Icon` library expanded to ~120 glyphs (payments, actions, retail/food categories); `@mauzo/utils` adds `icons.ts` (category/method → icon mapping). Backend: `GET /t/catalog/overview` — real totals/active/archived/low-stock plus 30-day per-status trends replayed from `stock_movements`; product list rows gain `image_url`, `stock`, `low_stock` (branch-scoped stock_balances + reorder_levels); list filters extended (category/brand/kind/status incl. `status=all`). Web: every back-office page migrated to `PageHeader` (dashboard, catalog, taxonomy → "Catalogue settings" tabs, inventory, pricing, sales, customers, employees, roles, modules, terminals, audit, settings, receipts, onboarding wizard w/ check-circle stepper + progress card); `/catalog` redesigned to the reference (4 StatCards, filter pills, thumb+category-chip table); `SaleList` gains StatCard KPIs + shared Select filters; import/export moved to `TransferMenu`. POS: all emoji replaced with `Icon` glyphs across ActionBar (payment methods, F-key actions), MoreModal, ProductArea (category tiles, weighted badge, barcode/search), TopBar (logo, printer, clock, settings, lock), LockScreen; `PaidDone` check icon; `✕/✓` dingbats replaced in POS + web row components. Lint hardening: gosec `//nolint` audit comments on printer spooler/ESC-POS marshalling; funlen extractions (`lowStockTrend`, `NewContainer`). Verified: `go test -p 1` all green, `golangci-lint` 0 issues, svelte-check web+POS 0/0, eslint+prettier clean, web+POS builds clean, Wails exe rebuilt, overview endpoint live-verified, zero `Extended_Pictographic` left in frontend source. |
+| 2026-11-24 | Phase 9 — M-Pesa (Daraja). `pkg/daraja`: OAuth client with cached tokens, STK Push + STK Query (ResultInt normaliser — Daraja returns codes as strings *or* numbers), RegisterC2B v2 (till + paybill), Reversal, C2B simulate, typed decoders for every callback. Migration 00016: `mpesa_credentials` (AES-256-GCM sealed secrets via `MPESA_CRED_KEY` — production boot fails without it), `mpesa_transactions` (NULLable `trans_id`/`checkout_request_id` unique keys so dedupe never collides on empty), `mpesa_events` (raw callback audit — unsigned payloads are stored before processing; the unguessable `callback_token` in the registered URL path is the shared secret), `mpesa_reversals`. `modules/mpesa`: config save/view with masked secrets + masked re-save preserving stored values, C2B register/confirm/validate ingestion with trans_id dedupe + pending-row merge, STK initiate (E.164 normalisation, per-day push ceiling), callback + status-query fallback, verification-gated allocate/reallocate (amount must match, sale must be payable, ref-cited payments verify), amount/ref matching suggestions, reversal request + async result handling (failed reversal restores the collection), summary stats, SSE feed broker. `modules/sales`: `methods["mpesa"]` + `MpesaConsumer` — confirmed txns are consumed inside the sale's Complete tx (atomic) and released on void. `modules/pos`: device-auth `/pos/mpesa` stk/status/feed/recent/allocate under cashier perms. Desktop: Wails bindings incl. SSE pump → `mpesa:feed` events. POS UI: `MpesaPay` (phone → push → poll → auto-fill ref), feed modal with live unallocated collections, cart seeds picked codes. Web: `/mpesa` reconciliation (StatCards, tab filters, detail drawer with allocate picker + reversal + event trail), `SettingsModal` (masked creds, register URLs, test push), `mpesa_collections` dashboard KPI live. Tests: `pkg/daraja` httptest suite; `modules/mpesa` integration (masked re-save, STK success/cancel/fallback, C2B dedupe + merge, allocate happy/mismatch/ref-cited, in-tx consume/release/rollback, full reversal flow, token resolution, phone normalisation, suggestions) — caught and fixed two real bugs (`UpdateStatus` arg-order silently swallowed; reversal result couldn't transition `rev_pending`). `go test -p 1 ./...` all green, `golangci-lint` 0 issues, svelte-check web+POS 0/0. |

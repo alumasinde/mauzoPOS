@@ -25,6 +25,9 @@ function newCart() {
   let grant = $state('');
   let customerID = $state('');
   let customerName = $state('');
+  // M-Pesa code picked from the collection feed — seeds the mpesa row's
+  // reference in the next PayModal.
+  let mpesaRef = $state('');
   const bridge = desktop();
 
   function sameLine(r: CartRow, product_id: number, variant_id: number) {
@@ -72,6 +75,12 @@ function newCart() {
     },
     get customerName() {
       return customerName;
+    },
+    get mpesaRef() {
+      return mpesaRef;
+    },
+    set mpesaRef(v: string) {
+      mpesaRef = v;
     },
     setCustomer(id: string, name: string) {
       customerID = id;
@@ -146,6 +155,7 @@ function newCart() {
       grant = '';
       customerID = '';
       customerName = '';
+      mpesaRef = '';
     },
 
     /** Serialise for hold/sale. */

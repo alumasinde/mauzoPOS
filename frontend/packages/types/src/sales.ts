@@ -1,7 +1,7 @@
 // Phase 7 — sales, payments, customers, returns.
 
 export type SaleStatus = 'completed' | 'voided' | 'returned' | 'partially_returned';
-export type PayMethod = 'cash' | 'card' | 'bank' | 'credit';
+export type PayMethod = 'cash' | 'mpesa' | 'card' | 'bank' | 'credit';
 
 export interface Sale {
   id: string;

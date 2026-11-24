@@ -6,7 +6,7 @@ import PaymentMethods from './widgets/PaymentMethods.svelte';
 import RecentSales from './widgets/RecentSales.svelte';
 import SalesOverview from './widgets/SalesOverview.svelte';
 import TerminalStatus from './widgets/TerminalStatus.svelte';
-import { delta, fetchDaily, fetchMethods, fetchSummary } from './widgets/salesApi';
+import { delta, fetchDaily, fetchMethods, fetchSummary, fetchMpesaSummary } from './widgets/salesApi';
 
 /**
  * Front-end half of the dashboard widget registry. The API decides which
@@ -93,7 +93,16 @@ export const WIDGETS: Record<string, WidgetEntry> = {
     kind: 'kpi',
     icon: 'phone',
     tone: 'teal',
-    pendingNote: 'Live once M-Pesa is connected',
+    pendingNote: '',
+    load: async () => {
+      const s = await fetchMpesaSummary();
+      return {
+        value: `KSh ${formatMoney(s.collected_today)}`,
+        delta: null,
+        deltaLabel: `${s.unallocated} unallocated`,
+        trend: [],
+      };
+    },
   },
   // payments (Phase 7)
   cash_collections: {

@@ -21,6 +21,7 @@ import (
 	"mauzo/internal/modules/customers"
 	"mauzo/internal/modules/dashboard"
 	"mauzo/internal/modules/inventory"
+	"mauzo/internal/modules/mpesa"
 	"mauzo/internal/modules/onboarding"
 	"mauzo/internal/modules/pos"
 	"mauzo/internal/modules/pricing"
@@ -100,6 +101,7 @@ func tenantRoutes(r chi.Router, c *app.Container) {
 		customers.TenantRoutes(r, c.Customers)
 		sales.TenantRoutes(r, c.Sales)
 		receipts.TenantRoutes(r, c.Receipts)
+		mpesa.TenantRoutes(r, c.MPesa)
 		onboarding.TenantRoutes(r, c.Onboarding)
 	})
 }
@@ -114,5 +116,7 @@ func posRoutes(r chi.Router, c *app.Container) {
 	})
 }
 
-// webhookRoutes: provider callbacks — M-Pesa, eTIMS (Phase 9+).
-func webhookRoutes(_ chi.Router, _ *app.Container) {}
+// webhookRoutes: provider callbacks — M-Pesa Daraja now, eTIMS later.
+func webhookRoutes(r chi.Router, c *app.Container) {
+	mpesa.HookRoutes(r, c.MPesa)
+}

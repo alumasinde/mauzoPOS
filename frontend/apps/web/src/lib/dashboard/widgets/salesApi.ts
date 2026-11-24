@@ -83,3 +83,17 @@ export function delta(current: number, previous: number): number | null {
   if (previous <= 0) return current > 0 ? 100 : null;
   return Math.round(((current - previous) / previous) * 100);
 }
+
+export interface MpesaSummary {
+  collected_today: string;
+  count_today: number;
+  unallocated: number;
+  pending: number;
+  failed_7d: number;
+  reversed: number;
+}
+
+/** M-Pesa collections summary for the dashboard KPI. */
+export function fetchMpesaSummary(): Promise<MpesaSummary> {
+  return api.get<MpesaSummary>('/api/v1/t/mpesa/summary');
+}

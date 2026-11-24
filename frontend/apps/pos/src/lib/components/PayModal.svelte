@@ -9,6 +9,8 @@
   import { formatMoney } from '../money';
   import CustomerPick from './CustomerPick.svelte';
   import PaidDone from './PaidDone.svelte';
+  import MpesaPay from './MpesaPay.svelte';
+  import { mpesafeed } from '../mpesafeed.svelte';
 
   let {
     currency = 'KSh',
@@ -25,6 +27,7 @@
   const bridge = desktop();
   const METHODS: { key: string; label: string; ref: boolean; tendered: boolean }[] = [
     { key: 'cash', label: 'Cash', ref: false, tendered: true },
+    { key: 'mpesa', label: 'M-Pesa', ref: true, tendered: false },
     { key: 'card', label: 'Card', ref: true, tendered: false },
     { key: 'bank', label: 'Bank', ref: true, tendered: false },
     { key: 'credit', label: 'Credit', ref: false, tendered: false },
@@ -37,7 +40,16 @@
     reference: string;
   }
 
-  let rows = $state<PayRow[]>(untrack(() => [{ method, amount: '', tendered: '', reference: '' }]));
+  let rows = $state<PayRow[]>(
+    untrack(() => [
+      {
+        method,
+        amount: '',
+        tendered: '',
+        reference: method === 'mpesa' ? cart.mpesaRef : '',
+      },
+    ]),
+  );
   let busy = $state(false);
   let error = $state('');
   let done = $state<PayResult | null>(null);
@@ -75,6 +87,12 @@
     return METHODS.find((x) => x.key === m) ?? CASH;
   }
 
+  function refPlaceholder(m: string): string {
+    if (m === 'mpesa') return 'M-Pesa code (e.g. QKR7ABC123)';
+    if (m === 'card') return 'Card slip / approval ref';
+    return 'Transfer reference';
+  }
+
   const valid = $derived(
     rows.length > 0 &&
       Math.abs(paidNum - totalNum) < 0.005 &&
@@ -102,6 +120,12 @@
         '',
       );
       done = res;
+      // Claimed transactions leave the till's unallocated feed.
+      for (const r of rows) {
+        if (r.method === 'mpesa' && r.reference.trim()) {
+          mpesafeed.dropByTrans(r.reference.trim());
+        }
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Payment failed';
     } finally {
@@ -141,10 +165,13 @@
             />
           {/if}
           {#if spec(r.method).ref}
-            <input
-              class="wide"
-              bind:value={r.reference}
-              placeholder="{r.method === 'card' ? 'Card slip / approval ref' : 'Transfer reference'} *"
+            <input class="wide" bind:value={r.reference} placeholder="{refPlaceholder(r.method)} *" />
+          {/if}
+          {#if r.method === 'mpesa'}
+            <MpesaPay
+              amount={r.amount || remaining.toFixed(2)}
+              onconfirmed={(id) => (r.reference = id)}
+              onfailed={() => {}}
             />
           {/if}
         </div>

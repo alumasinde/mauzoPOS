@@ -11,6 +11,7 @@
   import ValuePrompt from './ValuePrompt.svelte';
   import MoreModal from './MoreModal.svelte';
   import LookupModal from './LookupModal.svelte';
+  import MpesaFeedModal from './MpesaFeedModal.svelte';
 
   type Modal =
     | 'none'
@@ -22,7 +23,8 @@
     | 'pay'
     | 'more'
     | 'unknown'
-    | 'lookup';
+    | 'lookup'
+    | 'mpesa';
 
   let {
     currency = 'KSh',
@@ -45,6 +47,8 @@
   const bridge = desktop();
   let which = $state<Modal>('none');
   let pendingSupervisor: (() => void) | null = $state(null);
+  // The pay modal's method defaults to the action bar's; a feed pick forces mpesa.
+  let payMethod = $state('');
 
   // price check
   let pcCode = $state('');
@@ -63,6 +67,7 @@
   let unknownCode = $state('');
 
   export function open(m: Modal, code = '') {
+    if (m === 'pay') payMethod = '';
     which = m;
     if (m === 'pricecheck') {
       pcCode = code;
@@ -120,7 +125,17 @@
 </script>
 
 {#if which === 'pay'}
-  <PayModal {currency} {method} onclose={close} {onpaid} />
+  <PayModal {currency} method={payMethod || method} onclose={close} {onpaid} />
+{:else if which === 'mpesa'}
+  <div class="overlay" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
+    <MpesaFeedModal
+      onclose={close}
+      onuse={() => {
+        payMethod = 'mpesa';
+        which = 'pay';
+      }}
+    />
+  </div>
 {:else if which === 'held'}
   <HeldModal onclose={close} {onhold} />
 {:else if which === 'lookup'}
@@ -191,6 +206,7 @@
         {onswitch}
         onheld={() => open('held')}
         onlookup={() => open('lookup')}
+        onmpesa={() => open('mpesa')}
       />
     {:else if which === 'unknown'}
       <div class="modal">

@@ -53,6 +53,7 @@ type Service struct {
 	promos    Promos
 	stock     Stock
 	customers CustomerLookup
+	mpesa     MpesaConsumer
 }
 
 // NewService builds a Service.

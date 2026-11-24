@@ -144,6 +144,28 @@ export interface ReprintResult {
   error?: string;
 }
 
+/** One M-Pesa feed transaction (server wire shape). */
+export interface MpesaTxn {
+  public_id: string;
+  kind: string; // stk | c2b
+  status: string; // pending | success | failed | cancelled | timeout | reversed…
+  trans_id?: string;
+  checkout_request_id?: string;
+  phone: string;
+  payer_name: string;
+  amount: string;
+  account_ref: string;
+  result_desc: string;
+  trans_time?: string;
+  created_at: string;
+}
+
+/** One SSE feed event from the Go pump. */
+export interface MpesaFeedEvent {
+  kind: string; // collection | reversal
+  txn: MpesaTxn;
+}
+
 export type PrinterKind = 'none' | 'windows' | 'network' | 'file';
 export type AutoPrint = 'default' | 'always' | 'never';
 
@@ -242,6 +264,12 @@ interface DesktopApp {
   PrintLast(): Promise<void>;
   Reprint(ref: string, grant: string): Promise<ReprintResult>;
   OpenDrawer(): Promise<void>;
+  MpesaPush(phone: string, amount: string, accountRef: string): Promise<MpesaTxn>;
+  MpesaStatus(id: string): Promise<MpesaTxn>;
+  MpesaRecent(): Promise<{ items: MpesaTxn[] }>;
+  MpesaAllocate(id: string, saleRef: string): Promise<void>;
+  MpesaFeedStart(): Promise<void>;
+  MpesaFeedStop(): Promise<void>;
 }
 
 declare global {

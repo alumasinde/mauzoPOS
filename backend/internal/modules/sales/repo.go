@@ -486,3 +486,33 @@ func (r *Repo) Daily(ctx context.Context, tenantID uint64, f ListFilter) ([]Dail
 		 FROM sales s `+saleJoins+where+` GROUP BY DATE(s.sold_at) ORDER BY day`, args...)
 	return out, err
 }
+
+// MpesaCandidates returns completed sales carrying mpesa tender since `since`
+// — the mpesa reconciliation screen matches collections against these.
+func (r *Repo) MpesaCandidates(ctx context.Context, tenantID uint64, since time.Time) ([]MpesaCandidate, error) {
+	var rows []MpesaCandidate
+	err := r.conn.SelectContext(ctx, &rows,
+		`SELECT s.id AS sale_id, s.public_id, s.receipt_no, s.branch_id,
+		   b.name AS branch_name, COALESCE(u.name,'') AS cashier_name,
+		   s.total, SUM(sp.amount) AS mpesa_amount,
+		   COALESCE(MAX(NULLIF(sp.reference,'')),'') AS reference, s.sold_at
+		 FROM sales s
+		 JOIN sale_payments sp ON sp.sale_id = s.id AND sp.method = 'mpesa' AND sp.amount > 0
+		 JOIN branches b ON b.id = s.branch_id
+		 LEFT JOIN users u ON u.id = s.cashier_id
+		 WHERE s.tenant_id = ? AND s.status IN ('completed','partially_returned') AND s.sold_at >= ?
+		 GROUP BY s.id, s.public_id, s.receipt_no, s.branch_id, b.name, u.name, s.total, s.sold_at
+		 ORDER BY s.sold_at DESC`, tenantID, since)
+	return rows, err
+}
+
+// SaleBrief resolves an internal id to the public reference (mpesa display).
+func (r *Repo) SaleBrief(ctx context.Context, tenantID, saleID uint64) (*SaleBrief, error) {
+	var b SaleBrief
+	err := r.conn.GetContext(ctx, &b,
+		`SELECT public_id, receipt_no FROM sales WHERE tenant_id=? AND id=?`, tenantID, saleID)
+	if err != nil {
+		return nil, err
+	}
+	return &b, nil
+}

@@ -216,6 +216,11 @@ func (s *Service) insertSale(ctx context.Context, in CompleteInput, sale *Sale,
 				return err
 			}
 		}
+		// Claim the M-Pesa transactions cited by payment references — a
+		// mismatched or unconfirmed code rolls the whole sale back.
+		if err := s.consumeMpesa(ctx, tx, sale.TenantID, payments, sale.ID); err != nil {
+			return err
+		}
 		if len(stockItems) > 0 {
 			if err := s.stock.PostStockInTx(ctx, tx, sale.TenantID, in.ActorID, sale.BranchID,
 				"sale", "sale", sale.PublicID, "", "", stockItems, -1); err != nil {

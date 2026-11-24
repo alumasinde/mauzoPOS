@@ -21,6 +21,9 @@ var methods = map[string]MethodSpec{
 	"card":   {Label: "Card", RequiresReference: true},
 	"bank":   {Label: "Bank transfer", RequiresReference: true},
 	"credit": {Label: "Customer credit", RequiresCustomer: true},
+	// mpesa: reference is the M-Pesa transaction code (e.g. QKR7ABC123); a
+	// confirmed feed transaction with that code is consumed at completion.
+	"mpesa": {Label: "M-Pesa", RequiresReference: true},
 }
 
 // Methods returns the registry for API clients.

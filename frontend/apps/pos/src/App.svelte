@@ -4,6 +4,7 @@
   import { desktop, type ActivateResult, type Cashier, type Session } from './lib/desktop';
   import { cart } from './lib/cart.svelte';
   import { pulse } from './lib/pulse.svelte';
+  import { mpesafeed } from './lib/mpesafeed.svelte';
   import { createScanner } from './lib/scanner';
   import { posKeydown } from './lib/keys';
   import TopBar from './lib/components/TopBar.svelte';
@@ -26,7 +27,7 @@
   let pinError = $state('');
   let pinBusy = $state(false);
   let locked = $state(false);
-  let method = $state<'cash' | 'card' | 'bank' | 'credit'>('cash');
+  let method = $state<'cash' | 'mpesa' | 'card' | 'bank' | 'credit'>('cash');
   let now = $state(new Date());
   let modals = $state<Modals | null>(null);
   let productArea = $state<ProductArea | null>(null);
@@ -67,6 +68,7 @@
     }
     await pulse.refresh();
     await pulse.loadLayout();
+    void mpesafeed.start();
     session = await bridge!.CurrentSession();
     if (session) {
       screen = 'checkout';

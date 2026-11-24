@@ -5,14 +5,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/shopspring/decimal"
 
 	"mauzo/internal/core/authz"
 	"mauzo/internal/core/httpx"
 	"mauzo/internal/core/security"
+	"mauzo/internal/modules/mpesa"
 	"mauzo/internal/modules/sales"
 )
 
@@ -38,6 +41,7 @@ type Service struct {
 	repo     *Repo
 	sales    Sales
 	receipts Receipts
+	mpesa    Mpesa
 
 	mu     sync.Mutex
 	fails  map[uint64]*pinFail
@@ -63,6 +67,20 @@ type Sales interface {
 	Complete(ctx context.Context, in sales.CompleteInput) (sales.SaleDetail, bool, error)
 	GetByReceipt(ctx context.Context, tenantID, branchID uint64, ref string) (sales.SaleDetail, error)
 	Authz(ctx context.Context, tenantID, userID uint64) (*sales.CashierAuthz, error)
+}
+
+// BindMpesa attaches the M-Pesa service (nil when the module is disabled).
+func (s *Service) BindMpesa(v Mpesa) { s.mpesa = v }
+
+// Mpesa is the M-Pesa surface the till uses — STK pushes, status polls, the
+// live collection feed and allocation.
+type Mpesa interface {
+	InitiateSTK(ctx context.Context, tenantID, branchID, byUserID uint64,
+		phone, accountRef, note string, amount decimal.Decimal) (*mpesa.Transaction, error)
+	STKStatus(ctx context.Context, tenantID uint64, publicID string) (*mpesa.Transaction, error)
+	FeedSince(ctx context.Context, tenantID uint64) ([]mpesa.Transaction, error)
+	ServeFeed(w http.ResponseWriter, r *http.Request, tenantID uint64)
+	Allocate(ctx context.Context, tenantID, actorID uint64, txnPublicID, salePublicID string) error
 }
 
 // ---- activation --------------------------------------------------------------

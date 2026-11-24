@@ -149,7 +149,6 @@
     }
   }
 
-
   function printLabels() {
     const ids = rows
       .slice(0, 20)

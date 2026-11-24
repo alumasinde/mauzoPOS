@@ -47,6 +47,11 @@ func DeviceRoutes(r chi.Router, h *Handler) {
 	r.Post("/held", h.Held)
 	r.Post("/held/{id}/recall", h.RecallHeld)
 	r.Delete("/held/{id}", h.CancelHeld)
+	r.Post("/mpesa/stk", h.STK)
+	r.Get("/mpesa/feed", h.MpesaFeed)
+	r.Get("/mpesa/recent", h.MpesaRecent)
+	r.Get("/mpesa/{id}/status", h.STKStatus)
+	r.Post("/mpesa/{id}/allocate", h.MpesaAllocate)
 }
 
 // DeviceAuth resolves the terminal bearer token. The device token

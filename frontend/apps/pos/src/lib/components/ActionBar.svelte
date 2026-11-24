@@ -3,7 +3,7 @@
   import { cart } from '../cart.svelte';
   import { formatMoney } from '../money';
 
-  type Method = 'cash' | 'card' | 'bank' | 'credit';
+  type Method = 'cash' | 'mpesa' | 'card' | 'bank' | 'credit';
   let {
     currency = 'KSh',
     method = $bindable<Method>('cash'),
@@ -16,6 +16,7 @@
 
   const methods: { key: Method; label: string; icon: string }[] = [
     { key: 'cash', label: 'Cash', icon: 'banknote' },
+    { key: 'mpesa', label: 'M-Pesa', icon: 'phone' },
     { key: 'card', label: 'Card', icon: 'credit-card' },
     { key: 'bank', label: 'Bank', icon: 'landmark' },
     { key: 'credit', label: 'Credit', icon: 'book' },
@@ -157,7 +158,16 @@
     background: #2f5fb3;
   }
   .pm:nth-child(4) {
+    background: #2f5fb3;
+  }
+  .pm:nth-child(5) {
     background: #5a6270;
+  }
+  .pm:nth-child(2) {
+    background: #00a651; /* Safaricom green */
+  }
+  .pm:nth-child(3) {
+    background: #237a3d;
   }
   .pi {
     display: inline-flex;

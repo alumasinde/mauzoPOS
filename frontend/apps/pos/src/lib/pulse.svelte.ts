@@ -4,6 +4,7 @@
 import { toast } from '@mauzo/ui';
 import { desktop, type PayResult, type POSLayout, type Status, type TerminalInfo } from './desktop';
 import { cart } from './cart.svelte';
+import { mpesafeed } from './mpesafeed.svelte';
 
 const bridge = desktop();
 let info = $state<TerminalInfo | null>(null);
@@ -42,6 +43,7 @@ export const pulse = {
       const sent = await bridge.SyncPending().catch(() => 0);
       if (sent > 0) toast.success(`Uploaded ${sent} queued sale${sent === 1 ? '' : 's'}.`);
     }
+    if (online) void mpesafeed.start(); // idempotent — reconnects when dropped
     void this.refresh();
   },
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@mauzo/ui';
-  // The "More" action sheet — sync, switch cashier, lock, held sales.
+  import { mpesafeed } from '../mpesafeed.svelte';
+  // The "More" action sheet — sync, switch cashier, lock, held sales, M-Pesa.
   let {
     onclose,
     onlock,
@@ -8,6 +9,7 @@
     onswitch,
     onheld,
     onlookup,
+    onmpesa,
   }: {
     onclose: () => void;
     onlock: () => void;
@@ -15,6 +17,7 @@
     onswitch: () => void;
     onheld: () => void;
     onlookup: () => void;
+    onmpesa: () => void;
   } = $props();
 
   function run(fn: () => void) {
@@ -35,6 +38,10 @@
     <button class="btn" onclick={run(onlock)}><Icon name="lock" size={26} /><span>Lock till</span></button>
     <button class="btn" onclick={onheld}><Icon name="pause" size={26} /><span>Held sales</span></button>
     <button class="btn" onclick={onlookup}><Icon name="search" size={26} /><span>Find sale</span></button>
+    <button class="btn" onclick={onmpesa}>
+      <Icon name="phone" size={26} /><span>M-Pesa</span>
+      {#if mpesafeed.count > 0}<em class="badge">{mpesafeed.count}</em>{/if}
+    </button>
   </div>
   <button class="ghost" onclick={onclose}>Close</button>
 </div>
@@ -57,6 +64,7 @@
     margin-bottom: var(--space-3);
   }
   .btn {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -67,6 +75,18 @@
     background: var(--color-surface);
     cursor: pointer;
     color: var(--color-primary);
+  }
+  .badge {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    background: #00a651;
+    color: #fff;
+    font-size: 0.7rem;
+    font-style: normal;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 7px;
   }
   .btn span {
     font-size: var(--text-sm);

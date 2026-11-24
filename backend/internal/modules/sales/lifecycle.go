@@ -35,6 +35,11 @@ func (s *Service) Void(ctx context.Context, tenantID uint64, publicID, reason st
 		if err := s.repo.VoidPayments(ctx, tx, sale.ID); err != nil {
 			return err
 		}
+		// Free any M-Pesa transactions this sale claimed so they can be
+		// re-allocated (the money itself stays — reversal is a separate op).
+		if err := s.releaseMpesa(ctx, tx, sale.ID); err != nil {
+			return err
+		}
 		stockItems := restockItems(items)
 		if len(stockItems) > 0 {
 			if err := s.stock.PostStockInTx(ctx, tx, tenantID, actorID, sale.BranchID,

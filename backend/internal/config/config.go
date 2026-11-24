@@ -29,6 +29,9 @@ type Config struct {
 	Onboarding     OnboardingConfig
 	// UploadDir is the local root for stored uploads (product images).
 	UploadDir string
+	// MpesaCredKey encrypts stored Daraja credentials (AES-256-GCM). Required
+	// in production; development falls back to a derived key.
+	MpesaCredKey string
 }
 
 // OnboardingConfig holds new-tenant onboarding settings.
@@ -160,7 +163,8 @@ func Load(envFiles ...string) (Config, error) {
 		Onboarding: OnboardingConfig{
 			TrialDays: e.int("ONBOARDING_TRIAL_DAYS", 14),
 		},
-		UploadDir: getStr("UPLOAD_DIR", "uploads"),
+		UploadDir:    getStr("UPLOAD_DIR", "uploads"),
+		MpesaCredKey: getStr("MPESA_CRED_KEY", getStr("ENCRYPTION_KEY", "")),
 	}
 	if e.err != nil {
 		return Config{}, e.err

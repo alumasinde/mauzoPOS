@@ -22,6 +22,7 @@ import (
 	"mauzo/internal/modules/catalog"
 	"mauzo/internal/modules/customers"
 	"mauzo/internal/modules/inventory"
+	"mauzo/internal/modules/mpesa"
 	"mauzo/internal/modules/onboarding"
 	"mauzo/internal/modules/pos"
 	"mauzo/internal/modules/pricing"
@@ -80,6 +81,7 @@ type Container struct {
 	Customers     *customers.Handler
 	Sales         *sales.Handler
 	Receipts      *receipts.Handler
+	MPesa         *mpesa.Handler
 }
 
 // NewContainer builds the logger, database pool and module services.
@@ -119,13 +121,12 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 	pricingSvc, promoSvc, invSvc := stockPricingStack(conn, catalogSvc, taxSvc, branchSvc)
 	customerSvc := customers.NewService(customers.NewRepo(conn))
 	salesSvc := sales.NewService(conn, sales.NewRepo(conn), catalogSvc, pricingSvc, promoSvc, invSvc, customerSvc)
-	posSvc := pos.NewService(conn, pos.NewRepo(conn))
-	posSvc.BindSales(salesSvc)
-	receiptSvc := receipts.NewService(conn, receipts.NewRepo(conn))
-	posSvc.BindReceipts(receiptSvc)
-	userSvc := users.NewUserService(userRepo, params, users.Deps{
-		Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc,
-	})
+	posSvc, mpesaSvc, receiptSvc, err := posPaymentsStack(conn, cfg, auditW, salesSvc)
+	if err != nil {
+		return nil, err
+	}
+	userSvc := users.NewUserService(userRepo, params,
+		users.Deps{Roles: roleSvc, Branches: branchSvc, Sessions: authSvc, Seats: planSvc, Access: accessSvc})
 
 	return &Container{
 		Config:      cfg,
@@ -165,7 +166,41 @@ func NewContainer(ctx context.Context, cfg config.Config) (*Container, error) {
 		Customers: customers.NewHandler(customerSvc),
 		Sales:     sales.NewHandler(salesSvc, branchSvc),
 		Receipts:  receipts.NewHandler(receiptSvc, salesSvc),
+		MPesa:     mpesa.NewHandler(mpesaSvc),
 	}, nil
+}
+
+// posPaymentsStack builds the till, M-Pesa and receipt services and binds the
+// cross-module deps: sales consumes confirmed txns inside Complete, mpesa
+// reads sales for allocation verification, the till initiates pushes and
+// streams the feed.
+func posPaymentsStack(conn *sqlx.DB, cfg config.Config, auditW *audit.Writer,
+	salesSvc *sales.Service) (*pos.Service, *mpesa.Service, *receipts.Service, error) {
+	posSvc := pos.NewService(conn, pos.NewRepo(conn))
+	posSvc.BindSales(salesSvc)
+	mpesaSvc, err := mpesa.NewService(conn, mpesa.NewRepo(conn),
+		mpesaKey(cfg), cfg.PublicBaseURL, auditW)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	salesSvc.BindMpesa(mpesaSvc)
+	mpesaSvc.BindSales(salesSvc)
+	posSvc.BindMpesa(mpesaSvc)
+	receiptSvc := receipts.NewService(conn, receipts.NewRepo(conn))
+	posSvc.BindReceipts(receiptSvc)
+	return posSvc, mpesaSvc, receiptSvc, nil
+}
+
+// mpesaKey resolves the credential-encryption key. Production requires the env
+// var; development derives a stable local key so saved configs keep working.
+func mpesaKey(cfg config.Config) string {
+	if cfg.MpesaCredKey != "" {
+		return cfg.MpesaCredKey
+	}
+	if cfg.IsDevelopment() {
+		return "dev-mpesa-key:" + cfg.DB.Name
+	}
+	return "" // NewService errors — a production boot without a key must fail
 }
 
 // tenantTooling builds the tenant-scoped services shared by onboarding and the
